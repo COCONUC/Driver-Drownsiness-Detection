@@ -36,7 +36,6 @@ target 'Runner' do
   # Add MediaPipe Pods
   pod 'TensorFlowLiteSwift'
   pod 'GoogleMLKit/FaceDetection'
-end
 
   target 'RunnerTests' do
     inherit! :search_paths
