@@ -52,6 +52,7 @@ class CameraPreviewScreen extends StatefulWidget {
 class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  String detectionResult = '';
 
   @override
   void initState() {
@@ -68,7 +69,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     // Initialize the controller with the front camera
     if (frontCamera != null) {
-      _controller = CameraController(frontCamera, ResolutionPreset.medium);
+      _controller = CameraController(frontCamera, ResolutionPreset.high);
       _initializeControllerFuture = _controller.initialize();
     } else {
       // Handle case where no front camera is found
@@ -82,9 +83,26 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     super.dispose();
   }
 
-  void _processImage() async {
-    String result = await MediaPipeChannel.processImage();
-    print(result); // Output the result for testing
+  // void _processImage() async {
+  //   String result = await MediaPipeChannel.processImage();
+  //   setState(() {
+  //     detectionResult = result; // Use this to update the UI accordingly
+  //   });
+  // }
+
+  void _captureFrame() async {
+    try {
+      // Capture the current frame
+      final image = await _controller.takePicture();
+
+      // Send the image path to the native side via platform channel
+      String result = await MediaPipeChannel.processImageWithPath(image.path);
+      setState(() {
+        detectionResult = result;
+      });
+    } catch (e) {
+      print('Error capturing frame: $e');
+    }
   }
 
   @override
@@ -107,8 +125,19 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               },
             ),
           ),
+          if (detectionResult.isNotEmpty)
+            Container(
+              color: detectionResult.contains("Drowsiness") ? Colors.red : Colors.green,
+              height: 50,
+              child: Center(
+                child: Text(
+                  detectionResult,
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ),
+            ),
           ElevatedButton(
-            onPressed: _processImage,
+            onPressed: _captureFrame,
             child: Text('Detect Drowsiness'),
           ),
         ],
