@@ -56,8 +56,24 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = CameraController(cameras[0], ResolutionPreset.medium);
-    _initializeControllerFuture = _controller.initialize();
+
+    // Find the front camera from the list of available cameras
+    CameraDescription? frontCamera;
+    for (var camera in cameras) {
+      if (camera.lensDirection == CameraLensDirection.front) {
+        frontCamera = camera;
+        break;
+      }
+    }
+
+    // Initialize the controller with the front camera
+    if (frontCamera != null) {
+      _controller = CameraController(frontCamera, ResolutionPreset.medium);
+      _initializeControllerFuture = _controller.initialize();
+    } else {
+      // Handle case where no front camera is found
+      print('Front camera not available');
+    }
   }
 
   @override
