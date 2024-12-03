@@ -109,7 +109,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           ),
           ElevatedButton(
             onPressed: _processImage,
-            child: Text('Test MediaPipe Processing'),
+            child: Text('Detect Drowsiness'),
           ),
         ],
       ),
