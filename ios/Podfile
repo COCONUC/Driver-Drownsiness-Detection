@@ -32,6 +32,12 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Add MediaPipe Pods
+  pod 'TensorFlowLiteSwift'
+  pod 'GoogleMLKit/FaceDetection'
+end
+
   target 'RunnerTests' do
     inherit! :search_paths
   end
