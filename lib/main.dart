@@ -1,13 +1,16 @@
+import 'package:driver_drownsiness_detection/tflite_service.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'mediapipe_channel.dart';
 
 List<CameraDescription> cameras = [];
+final TFLiteService _tfliteService = TFLiteService();
 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   cameras = await availableCameras();
+  await _tfliteService.loadModel();
   runApp(MyApp());
 }
 
