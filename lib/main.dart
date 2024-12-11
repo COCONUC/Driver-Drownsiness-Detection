@@ -2,6 +2,10 @@ import 'package:driver_drownsiness_detection/tflite_service.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'mediapipe_channel.dart';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
+import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 
 List<CameraDescription> cameras = [];
 final TFLiteService _tfliteService = TFLiteService();
@@ -106,6 +110,20 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     } catch (e) {
       print('Error capturing frame: $e');
     }
+  }
+
+  void detectDrowsiness(Uint8List imageBytes) async {
+    final InputProcessor processor = InputProcessor();
+
+    // Preprocess the input image
+    TensorImage inputImage = processor.preprocessImage(imageBytes);
+
+    // Perform inference
+    List<dynamic> output = _tfliteService.runModel(inputImage.buffer.asUint8List());
+
+    // Interpret the output
+    String prediction = interpretOutput(output);
+    print("Prediction: $prediction");
   }
 
   @override

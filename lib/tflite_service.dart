@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 
@@ -34,14 +35,23 @@ class TFLiteService {
   }
 }
 
-class ImageProcessor {
-  TensorImage preprocessImage(TensorImage inputImage) {
-    // Resize image to model input size
+class InputProcessor {
+  TensorImage preprocessImage(Uint8List imageData) {
+    // Decode image using the 'image' package
+    img.Image? decodedImage = img.decodeImage(imageData);
+    if (decodedImage == null) {
+      throw Exception("Failed to decode image.");
+    }
+
+    // Convert decoded image to TensorImage
+    TensorImage tensorImage = TensorImage.fromImage(decodedImage);
+
+    // Create an ImageProcessor with resize and normalization steps
     var imageProcessor = ImageProcessorBuilder()
-        .add(ResizeOp(224, 224, ResizeMethod.BILINEAR)) // Adjust size
-        .add(NormalizeOp(0, 255)) // Normalize pixel values
+        .add(ResizeOp(224, 224, ResizeMethod.BILINEAR)) // Resize to model input size
+        .add(NormalizeOp(0, 255)) // Normalize pixel values to [0, 1]
         .build();
 
-    return imageProcessor.process(inputImage);
+    return imageProcessor.process(tensorImage);
   }
 }
