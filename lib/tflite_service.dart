@@ -27,7 +27,7 @@ class TFLiteService {
       print("Error running model: $e");
     }
 
-    return output[0];
+    return output;
   }
 
   void close() {

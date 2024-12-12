@@ -10,6 +10,7 @@ import 'package:driver_drownsiness_detection/camera_service.dart';
 
 List<CameraDescription> cameras = [];
 final TFLiteService _tfliteService = TFLiteService();
+final CameraService _cameraService = CameraService();
 
 String interpretOutput(List<dynamic> output) {
   return output[0] == 1 ? "Drowsy" : "Alert";
@@ -20,6 +21,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   cameras = await availableCameras();
   await _tfliteService.loadModel();
+  try {
+    await _cameraService.initialize(); // Initialize the camera
+  } catch (e) {
+    print("Error initializing camera: $e");
+  }
   runApp(MyApp());
 }
 
@@ -103,6 +109,19 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
   String detectDrowsiness(Uint8List imageBytes){
+
+    var result = _tfliteService.runModel(imageBytes);
+    print("Detection Result: $result");
+
+    // Check the type of result and handle appropriately
+    if (result is int) {
+      print("Result is an integer: $result");
+    } else if (result is List) {
+      print("Result is a list: $result");
+    } else {
+      print("Unknown result type: ${result.runtimeType}");
+    }
+
     final InputProcessor processor = InputProcessor();
 
     // Preprocess the input image
@@ -145,8 +164,19 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       appBar: AppBar(
         title: Text('Driver Drowsiness Detection'),
       ),
-      body: Column(
+      body:
+      Column(
         children: [
+          FutureBuilder(future: _cameraService.initialize(), builder: (context, snapshot){
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text("Error initializing camera"));
+            } else {
+              return CameraPreview(_cameraService.controller); // Show preview
+            }
+          },
+          ),
           Expanded(
             child: FutureBuilder<void>(
               future: _initializeControllerFuture,
@@ -180,10 +210,16 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              try {
+                Uint8List imageBytes = await _cameraService.captureImage();
+                print("Image captured successfully!");
+                String result = detectDrowsiness(imageBytes);
+                updateResult(result);
+                // Add code to process or display the image
+              } catch (e) {
+              print("Error capturing image: $e");
+              }
               // Capture image and run inference
-              Uint8List imageBytes = await CameraService.captureImage();
-              String result = detectDrowsiness(imageBytes);
-              updateResult(result);
             },
             child: Text('Detect Drowsiness'),
           ),
