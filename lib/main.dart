@@ -7,10 +7,11 @@ import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 import 'package:driver_drownsiness_detection/camera_service.dart';
+import 'dart:async';
 
-List<CameraDescription> cameras = [];
 final TFLiteService _tfliteService = TFLiteService();
 final CameraService _cameraService = CameraService();
+List<CameraDescription> cameras = [];
 
 String interpretOutput(List<dynamic> output) {
   return output[0] == 1 ? "Drowsy" : "Alert";
@@ -19,7 +20,9 @@ String interpretOutput(List<dynamic> output) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize Camera
   cameras = await availableCameras();
+  // Load TensorFlow Lite model
   await _tfliteService.loadModel();
   try {
     await _cameraService.initialize(); // Initialize the camera
@@ -71,6 +74,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   String detectionResult = 'No Result';
+  Timer? _timer;
 
 
   @override
@@ -98,7 +102,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
+    _cameraService.dispose();
+    _tfliteService.close();
     super.dispose();
   }
 
@@ -109,7 +116,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
   String detectDrowsiness(Uint8List imageBytes){
-
     var result = _tfliteService.runModel(imageBytes);
     print("Detection Result: $result");
 
@@ -134,6 +140,28 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     String prediction = interpretOutput(output);
     print("Prediction: $prediction");
     return interpretOutput(output);
+  }
+
+  // Start periodic detection
+  void startDetection() {
+    _timer = Timer.periodic(Duration(seconds: 2), (timer) async {
+      try {
+        // Capture a frame from the camera
+        Uint8List imageBytes = await _cameraService.captureImage();
+
+        // Run inference using the TensorFlow Lite model
+        String result = detectDrowsiness(imageBytes);
+
+        // Update the detection result on the UI
+        setState(() {
+          detectionResult = result;
+        });
+
+        print("Detection Result: $result");
+      } catch (e) {
+        print("Error during detection: $e");
+      }
+    });
   }
 
   // void _processImage() async {
@@ -176,6 +204,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               return CameraPreview(_cameraService.controller); // Show preview
             }
           },
+          ),
+          ElevatedButton(
+            onPressed: startDetection,
+            child: Text("Start"),
           ),
           Expanded(
             child: FutureBuilder<void>(

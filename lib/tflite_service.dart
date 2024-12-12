@@ -54,4 +54,14 @@ class InputProcessor {
 
     return imageProcessor.process(tensorImage);
   }
+
+  // TensorImage preprocessImage(TensorImage inputImage) {
+  //   var imageProcessor = ImageProcessorBuilder()
+  //       .add(ResizeOp(224, 224, ResizeMethod.BILINEAR)) // Resize to input shape
+  //       .add(NormalizeOp(0, 255)) // Normalize pixel values to [0, 1]
+  //       .build();
+  //
+  //   return imageProcessor.process(inputImage);
+  // }
+
 }
