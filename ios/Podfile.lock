@@ -68,7 +68,8 @@ PODS:
   - TensorFlowLiteSwift/Privacy (2.17.0)
   - tflite_flutter (0.1.0):
     - Flutter
-    - TensorFlowLiteSwift
+  - tflite_flutter_helper (0.0.1):
+    - Flutter
 
 DEPENDENCIES:
   - audioplayers (from `.symlinks/plugins/audioplayers/ios`)
@@ -78,6 +79,7 @@ DEPENDENCIES:
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - TensorFlowLiteSwift
   - tflite_flutter (from `.symlinks/plugins/tflite_flutter/ios`)
+  - tflite_flutter_helper (from `.symlinks/plugins/tflite_flutter_helper/ios`)
 
 SPEC REPOS:
   trunk:
@@ -107,6 +109,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   tflite_flutter:
     :path: ".symlinks/plugins/tflite_flutter/ios"
+  tflite_flutter_helper:
+    :path: ".symlinks/plugins/tflite_flutter_helper/ios"
 
 SPEC CHECKSUMS:
   audioplayers: 455322b54050b30ea4b1af7cd9e9d105f74efa8c
@@ -127,7 +131,8 @@ SPEC CHECKSUMS:
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   TensorFlowLiteC: eac6d689a8d391d1b202dc59e3d9165ba64aaf73
   TensorFlowLiteSwift: 723fe42222815e72490c79feeff05305530de393
-  tflite_flutter: bf9c7d5c7ef011034c607d943d432623673c1c11
+  tflite_flutter: 9157a660578930a99728974f247369af1c3595d5
+  tflite_flutter_helper: 543b46b6bd064b21c92ea6e54bc0b29f1ce74cb5
 
 PODFILE CHECKSUM: 37fb08ae998b6e840716d084bbce025c7b5436e5
 

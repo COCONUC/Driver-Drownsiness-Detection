@@ -30,9 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  camera: ^0.10.0+4 # For camera access
+  camera: ^0.9.8+1 # For camera access
   tflite_flutter: ^0.9.0 # Updated version of TensorFlow Lite plugin
-  tflite_flutter_helper: ^0.2.1
+  tflite_flutter_helper: ^0.3.0
   image: ^3.0.1
   audioplayers: ^0.20.1 # For sound alerts
 
