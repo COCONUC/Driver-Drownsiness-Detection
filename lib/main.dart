@@ -6,9 +6,14 @@ import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
+import 'package:driver_drownsiness_detection/camera_service.dart';
 
 List<CameraDescription> cameras = [];
 final TFLiteService _tfliteService = TFLiteService();
+
+String interpretOutput(List<dynamic> output) {
+  return output[0] == 1 ? "Drowsy" : "Alert";
+}
 
 
 Future<void> main() async {
@@ -59,7 +64,8 @@ class CameraPreviewScreen extends StatefulWidget {
 class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
-  String detectionResult = '';
+  String detectionResult = 'No Result';
+
 
   @override
   void initState() {
@@ -90,6 +96,27 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     super.dispose();
   }
 
+  void updateResult(String result) {
+    setState(() {
+      detectionResult = result;
+    });
+  }
+
+  String detectDrowsiness(Uint8List imageBytes){
+    final InputProcessor processor = InputProcessor();
+
+    // Preprocess the input image
+    TensorImage inputImage = processor.preprocessImage(imageBytes);
+
+    // Perform inference
+    List<dynamic> output = _tfliteService.runModel(inputImage.buffer.asUint8List());
+
+    // Interpret the output
+    String prediction = interpretOutput(output);
+    print("Prediction: $prediction");
+    return interpretOutput(output);
+  }
+
   // void _processImage() async {
   //   String result = await MediaPipeChannel.processImage();
   //   setState(() {
@@ -110,20 +137,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     } catch (e) {
       print('Error capturing frame: $e');
     }
-  }
-
-  void detectDrowsiness(Uint8List imageBytes) async {
-    final InputProcessor processor = InputProcessor();
-
-    // Preprocess the input image
-    TensorImage inputImage = processor.preprocessImage(imageBytes);
-
-    // Perform inference
-    List<dynamic> output = _tfliteService.runModel(inputImage.buffer.asUint8List());
-
-    // Interpret the output
-    String prediction = interpretOutput(output);
-    print("Prediction: $prediction");
   }
 
   @override
@@ -157,8 +170,21 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                 ),
               ),
             ),
+          Expanded(
+            child: Center(
+              child: Text(
+                "Detection Result: $detectionResult",
+                style: TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
           ElevatedButton(
-            onPressed: _captureFrame,
+            onPressed: () async {
+              // Capture image and run inference
+              Uint8List imageBytes = await CameraService.captureImage();
+              String result = detectDrowsiness(imageBytes);
+              updateResult(result);
+            },
             child: Text('Detect Drowsiness'),
           ),
         ],
