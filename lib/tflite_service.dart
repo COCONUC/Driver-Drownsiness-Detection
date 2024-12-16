@@ -9,7 +9,7 @@ class TFLiteService {
   // Load the model
   Future<void> loadModel() async {
     try {
-      _interpreter = await Interpreter.fromAsset('models/drowsiness_detection.tflite');
+      _interpreter = await Interpreter.fromAsset('models/drowsiness_detection_model.tflite');
       print("Model loaded successfully!");
     } catch (e) {
       print("Error loading model: $e");
