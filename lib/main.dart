@@ -159,12 +159,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
         print("Detection Result: $result");
       } catch (e) {
-        // Log the error and continue without crashing the app
         print("Error during detection: $e");
       }
     });
   }
-
 
   // void _processImage() async {
   //   String result = await MediaPipeChannel.processImage();

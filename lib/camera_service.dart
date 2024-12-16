@@ -5,8 +5,6 @@ import 'dart:typed_data';
 class CameraService{
   late CameraController _controller;
   bool _isInitialized = false; // Add flag to track initialization
-  bool _isCapturing = false; // Add a flag to manage concurrent captures
-
 
   Future<void> initialize() async {
     final cameras = await availableCameras();
@@ -27,20 +25,12 @@ class CameraService{
     if (!_isInitialized) {
       throw Exception("Camera is not initialized. Call initialize() first.");
     }
-    // Check if a capture is already in progress
-    if (_isCapturing) {
-      throw Exception("Previous capture has not returned yet.");
-    }
-
     try {
-      _isCapturing = true; // Set capturing flag
       final XFile file = await _controller.takePicture();
       return await file.readAsBytes();
     } catch (e) {
       print("Error capturing image: $e");
       rethrow; // Rethrow error for further handling
-    } finally{
-      _isCapturing = false; // Reset capturing flag
     }
   }
 
