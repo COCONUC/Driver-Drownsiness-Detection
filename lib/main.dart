@@ -1,35 +1,7 @@
-import 'package:driver_drownsiness_detection/tflite_service.dart';
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'mediapipe_channel.dart';
-import 'dart:typed_data';
-import 'package:image/image.dart' as img;
-import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
-import 'package:driver_drownsiness_detection/camera_service.dart';
-import 'dart:async';
 
-final TFLiteService _tfliteService = TFLiteService();
-final CameraService _cameraService = CameraService();
-List<CameraDescription> cameras = [];
-
-String interpretOutput(List<dynamic> output) {
-  return output[0] == 1 ? "Drowsy" : "Alert";
-}
-
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Initialize Camera
-  cameras = await availableCameras();
-  // Load TensorFlow Lite model
-  await _tfliteService.loadModel();
-  try {
-    await _cameraService.initialize(); // Initialize the camera
-  } catch (e) {
-    print("Error initializing camera: $e");
-  }
-  runApp(MyApp());
+void main() {
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -39,7 +11,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Driver Drowsiness Detection',
+      title: 'Flutter Demo',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -56,207 +28,10 @@ class MyApp extends StatelessWidget {
         //
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
-        primarySwatch: Colors.blue,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: CameraPreviewScreen(),
-    );
-  }
-}
-
-class CameraPreviewScreen extends StatefulWidget {
-  @override
-  _CameraPreviewScreenState createState() => _CameraPreviewScreenState();
-}
-
-class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-  String detectionResult = 'No Result';
-  Timer? _timer;
-
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Find the front camera from the list of available cameras
-    CameraDescription? frontCamera;
-    for (var camera in cameras) {
-      if (camera.lensDirection == CameraLensDirection.front) {
-        frontCamera = camera;
-        break;
-      }
-    }
-
-    // Initialize the controller with the front camera
-    if (frontCamera != null) {
-      _controller = CameraController(frontCamera, ResolutionPreset.high);
-      _initializeControllerFuture = _controller.initialize();
-    } else {
-      // Handle case where no front camera is found
-      print('Front camera not available');
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    _cameraService.dispose();
-    _tfliteService.close();
-    super.dispose();
-  }
-
-  void updateResult(String result) {
-    setState(() {
-      detectionResult = result;
-    });
-  }
-
-  String detectDrowsiness(Uint8List imageBytes){
-    var result = _tfliteService.runModel(imageBytes);
-    print("Detection Result: $result");
-
-    // Check the type of result and handle appropriately
-    if (result is int) {
-      print("Result is an integer: $result");
-    } else if (result is List) {
-      print("Result is a list: $result");
-    } else {
-      print("Unknown result type: ${result.runtimeType}");
-    }
-
-    final InputProcessor processor = InputProcessor();
-
-    // Preprocess the input image
-    TensorImage inputImage = processor.preprocessImage(imageBytes);
-
-    // Perform inference
-    List<dynamic> output = _tfliteService.runModel(inputImage.buffer.asUint8List());
-
-    // Interpret the output
-    String prediction = interpretOutput(output);
-    print("Prediction: $prediction");
-    return interpretOutput(output);
-  }
-
-  // Start periodic detection
-  void startDetection() {
-    _timer = Timer.periodic(Duration(seconds: 2), (timer) async {
-      try {
-        // Capture a frame from the camera
-        Uint8List imageBytes = await _cameraService.captureImage();
-
-        // Run inference using the TensorFlow Lite model
-        String result = detectDrowsiness(imageBytes);
-
-        // Update the detection result on the UI
-        setState(() {
-          detectionResult = result;
-        });
-
-        print("Detection Result: $result");
-      } catch (e) {
-        print("Error during detection: $e");
-      }
-    });
-  }
-
-  // void _processImage() async {
-  //   String result = await MediaPipeChannel.processImage();
-  //   setState(() {
-  //     detectionResult = result; // Use this to update the UI accordingly
-  //   });
-  // }
-
-  void _captureFrame() async {
-    try {
-      // Capture the current frame
-      final image = await _controller.takePicture();
-
-      // Send the image path to the native side via platform channel
-      String result = await MediaPipeChannel.processImageWithPath(image.path);
-      setState(() {
-        detectionResult = result;
-      });
-    } catch (e) {
-      print('Error capturing frame: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Driver Drowsiness Detection'),
-      ),
-      body:
-      Column(
-        children: [
-          FutureBuilder(future: _cameraService.initialize(), builder: (context, snapshot){
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text("Error initializing camera"));
-            } else {
-              return CameraPreview(_cameraService.controller); // Show preview
-            }
-          },
-          ),
-          ElevatedButton(
-            onPressed: startDetection,
-            child: Text("Start"),
-          ),
-          Expanded(
-            child: FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return CameraPreview(_controller);
-                } else {
-                  return Center(child: CircularProgressIndicator());
-                }
-              },
-            ),
-          ),
-          if (detectionResult.isNotEmpty)
-            Container(
-              color: detectionResult.contains("Drowsiness") ? Colors.red : Colors.green,
-              height: 50,
-              child: Center(
-                child: Text(
-                  detectionResult,
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
-              ),
-            ),
-          Expanded(
-            child: Center(
-              child: Text(
-                "Detection Result: $detectionResult",
-                style: TextStyle(fontSize: 24),
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                Uint8List imageBytes = await _cameraService.captureImage();
-                print("Image captured successfully!");
-                String result = detectDrowsiness(imageBytes);
-                updateResult(result);
-                // Add code to process or display the image
-              } catch (e) {
-              print("Error capturing image: $e");
-              }
-              // Capture image and run inference
-            },
-            child: Text('Detect Drowsiness'),
-          ),
-        ],
-      ),
+      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }

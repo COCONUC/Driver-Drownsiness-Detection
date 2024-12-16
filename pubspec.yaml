@@ -30,11 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  camera: ^0.9.8+1 # For camera access
-  tflite_flutter: ^0.9.0 # Updated version of TensorFlow Lite plugin
-  tflite_flutter_helper: ^0.3.0
-  image: ^3.0.1
-  audioplayers: ^0.20.1 # For sound alerts
+  camera: ^0.10.3+2
+  tflite_flutter: ^0.10.0
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -64,9 +61,7 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  assets:
-    - assets/models/drowsiness_detection_model.tflite
-    - assets/models/pretrained_drowsiness_detection.tflite
+  # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
