@@ -65,7 +65,7 @@ class CameraPreviewScreen extends StatefulWidget {
 }
 
 class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
-  late CameraController _cameraController;
+  CameraController? _cameraController;
   late Future<void> _initializeControllerFuture;
   bool _isInitialized = false; // Add flag to track initialization
   bool _isCapturing = false; // Add a flag to manage concurrent captures
@@ -73,6 +73,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   Timer? _timer;
   DateTime? _lastDetectionTime; // Track the last detection time
   bool _isProcessingFrame = false; // Prevent overlapping frame processing
+  bool isDetecting = false; // Flag to control detection
 
 
   @override
@@ -111,7 +112,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         ResolutionPreset.medium,
         enableAudio: false
     );
-    await _cameraController.initialize();
+    await _cameraController?.initialize();
     _isInitialized = true; // Set flag to true after initialization
     _cameraController!.startImageStream(processCameraFrame);
   }
@@ -184,7 +185,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    _cameraController.dispose();
+    _cameraController?.dispose();
     // _cameraService.dispose();
     _tfliteService.close();
     super.dispose();
@@ -274,10 +275,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   void _captureFrame() async {
     try {
       // Capture the current frame
-      final image = await _cameraController.takePicture();
+      final image = await _cameraController?.takePicture();
 
       // Send the image path to the native side via platform channel
-      String result = await MediaPipeChannel.processImageWithPath(image.path);
+      String result = await MediaPipeChannel.processImageWithPath(image!.path);
       setState(() {
         detectionResult = result;
       });
