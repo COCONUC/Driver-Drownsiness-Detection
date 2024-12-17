@@ -19,12 +19,14 @@ class TFLiteService {
   // Run inference synchronously
   List<dynamic> runModel(Uint8List inputData) {
     var input = inputData; // Input must match model requirements
-    var output = List.filled(1, 0).reshape([1]); // Output placeholder
+
+    // Correct output placeholder with shape [1, 1]
+    var output = List.filled(1, [0.0]); // Nested list to match [1, 1]
 
     try {
       _interpreter.run(input, output);
       print("Inference Output: $output");
-      return output[0];
+      return output[0]; // Access the inner list
     } catch (e) {
       print("Error running model: $e");
       return ["Error"];
@@ -57,7 +59,8 @@ class TFLiteService {
   }
 
   String interpretOutput(List<dynamic> output) {
-    return output[0] == 1 ? "Drowsy" : "Alert";
+    double value = output[0][0];
+    return value > 0.5 ? "Drowsy" : "Alert";
   }
 
 }

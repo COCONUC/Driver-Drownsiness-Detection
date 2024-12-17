@@ -154,29 +154,30 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     return image.planes[0].bytes; // BGRA8888 is stored in the first plane
   }
 
+  // Preprocess BGRA8888 to 224x224 Float32 Tensor Input
+  // Preprocess BGRA8888 to 224x224 Float32 Tensor Input
+  // Preprocess BGRA8888 to 224x224 Float32 Tensor Input
   Uint8List preprocessBGRAImage(Uint8List bgraBytes, int width, int height) {
-    // Create an empty RGB image
-    img.Image rgbImage = img.Image(width, height);
-
     // Convert BGRA8888 to RGB
-    int byteIndex = 0;
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final b = bgraBytes[byteIndex++];
-        final g = bgraBytes[byteIndex++];
-        final r = bgraBytes[byteIndex++];
-        final a = bgraBytes[byteIndex++]; // Skip alpha (not used)
+    img.Image rawImage = img.Image.fromBytes(width, height, bgraBytes, format: img.Format.bgra);
 
-        // Set pixel in the RGB image
-        rgbImage.setPixel(x, y, img.getColor(r, g, b));
+    // Resize to 224x224
+    img.Image resizedImage = img.copyResize(rawImage, width: 224, height: 224);
+
+    // Normalize and convert to Float32
+    List<double> floatList = [];
+
+    for (int y = 0; y < resizedImage.height; y++) {
+      for (int x = 0; x < resizedImage.width; x++) {
+        final pixel = resizedImage.getPixel(x, y);
+        floatList.add((img.getRed(pixel) / 255.0));  // Red channel
+        floatList.add((img.getGreen(pixel) / 255.0)); // Green channel
+        floatList.add((img.getBlue(pixel) / 255.0));  // Blue channel
       }
     }
 
-    // Resize the image to the model's input size (e.g., 224x224)
-    img.Image resizedImage = img.copyResize(rgbImage, width: 224, height: 224);
-
-    // Encode the resized image as a byte array (JPG or PNG)
-    return Uint8List.fromList(img.encodeJpg(resizedImage));
+    // Convert List<double> to Float32List for input tensor
+    return Float32List.fromList(floatList).buffer.asUint8List();
   }
 
 
@@ -205,7 +206,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   // Run inference on the TensorFlow Lite model
   String detectDrowsiness(Uint8List inputBytes) {
     final result = _tfliteService.runModel(inputBytes);
-    return result == 1 ? "Drowsy" : "Alert";
+
+    // Access the single output value
+    double value = result[0];
+    return value > 0.5 ? "Drowsy" : "Alert";
   }
 
   String oldDetectDrowsiness(Uint8List imageBytes){
