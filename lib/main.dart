@@ -70,7 +70,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool _isInitialized = false; // Add flag to track initialization
   bool _isCapturing = false; // Add a flag to manage concurrent captures
   String detectionResult = 'No Result';
-  Timer? _timer;
+  Timer? _detectionTimer;
   DateTime? _lastDetectionTime; // Track the last detection time
   bool _isProcessingFrame = false; // Prevent overlapping frame processing
   bool isDetecting = false; // Flag to control detection
@@ -100,21 +100,90 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     // }
   }
 
+  // Initialize the front camera
   Future<void> initializeCamera() async {
     final cameras = await availableCameras();
-    // Select the front camera
     final frontCamera = cameras.firstWhere(
           (camera) => camera.lensDirection == CameraLensDirection.front,
       orElse: () => throw Exception("No front camera found!"),
     );
+
     _cameraController = CameraController(
-        frontCamera,
-        ResolutionPreset.medium,
-        enableAudio: false
+      frontCamera,
+      ResolutionPreset.medium,
+      enableAudio: false,
     );
-    await _cameraController?.initialize();
-    _isInitialized = true; // Set flag to true after initialization
-    _cameraController!.startImageStream(processCameraFrame);
+
+    await _cameraController!.initialize();
+    setState(() {});
+  }
+
+  // Future<void> initializeCamera() async {
+  //   final cameras = await availableCameras();
+  //   // Select the front camera
+  //   final frontCamera = cameras.firstWhere(
+  //         (camera) => camera.lensDirection == CameraLensDirection.front,
+  //     orElse: () => throw Exception("No front camera found!"),
+  //   );
+  //   _cameraController = CameraController(
+  //       frontCamera,
+  //       ResolutionPreset.medium,
+  //       enableAudio: false
+  //   );
+  //   await _cameraController?.initialize();
+  //   _isInitialized = true; // Set flag to true after initialization
+  //   _cameraController!.startImageStream(processCameraFrame);
+  // }
+
+  // Start detection (runs every 3 seconds)
+  void startDetection() {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      print("Camera not initialized!");
+      return;
+    }
+
+    isDetecting = true;
+
+    // Start the image stream
+    _cameraController!.startImageStream((CameraImage image) async {
+      if (!isDetecting || _isProcessingFrame) return;
+
+      try {
+        _isProcessingFrame = true;
+
+        // Preprocess BGRA8888 image
+        Uint8List inputBytes = preprocessBGRAImage(
+          image.planes[0].bytes,
+          image.width,
+          image.height,
+        );
+
+        // Run inference
+        String result = detectDrowsiness(inputBytes);
+
+        // Update UI
+        setState(() {
+          detectionResult = result;
+        });
+
+        print("Detection Result: $result");
+      } catch (e) {
+        print("Error during detection: $e");
+      } finally {
+        _isProcessingFrame = false;
+      }
+    });
+  }
+
+
+  // Stop detection
+  void stopDetection() {
+    isDetecting = false;
+    _detectionTimer?.cancel();
+
+    // Stop the image stream
+    _cameraController!.stopImageStream();
+    print("Detection Stopped!");
   }
 
   // Process frames from the camera
@@ -184,7 +253,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _detectionTimer?.cancel();
     _cameraController?.dispose();
     // _cameraService.dispose();
     _tfliteService.close();
@@ -204,11 +273,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   //   return _tfliteService.interpretOutput(output);
   // }
 
-  // Run inference on the TensorFlow Lite model
+  // Run TensorFlow Lite inference
   String detectDrowsiness(Uint8List inputBytes) {
     final result = _tfliteService.runModel(inputBytes);
-
-    // Access the single output value
     double value = result[0];
     return value > 0.5 ? "Drowsy" : "Alert";
   }
@@ -315,6 +382,18 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
             style: TextStyle(fontSize: 24),
           ),
           SizedBox(height: 20),
+          // Start/Stop Detection Button
+          ElevatedButton(
+            onPressed: () {
+              if (isDetecting) {
+                stopDetection();
+              } else {
+                startDetection();
+              }
+              setState(() {}); // Update button text
+            },
+            child: Text(isDetecting ? "Stop Detection" : "Start Detection"),
+          ),
           // ElevatedButton(
           //   onPressed: startDetection,
           //   child: Text("Start"),
