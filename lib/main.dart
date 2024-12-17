@@ -34,6 +34,8 @@ class _MyAppState extends State<MyApp> {
       if (!mounted) return;
       setState(() {});
       controller.startImageStream((image) async {
+        print('Image format: ${image.format.raw}');
+        print('Number of planes: ${image.planes.length}');
         // Convert YUV to JPEG here
         Uint8List? jpegBytes = await convertYUV420toJpeg(image);
         if (jpegBytes != null) {

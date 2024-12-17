@@ -1,6 +1,4 @@
 PODS:
-  - audioplayers (0.0.1):
-    - Flutter
   - camera_avfoundation (0.0.1):
     - Flutter
   - Flutter (1.0.0)
@@ -53,33 +51,36 @@ PODS:
     - nanopb/encode (= 2.30910.0)
   - nanopb/decode (2.30910.0)
   - nanopb/encode (2.30910.0)
-  - path_provider_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
   - PromisesObjC (2.4.0)
-  - TensorFlowLiteC (2.17.0):
-    - TensorFlowLiteC/Core (= 2.17.0)
-  - TensorFlowLiteC/Core (2.17.0)
-  - TensorFlowLiteSwift (2.17.0):
-    - TensorFlowLiteSwift/Core (= 2.17.0)
-  - TensorFlowLiteSwift/Core (2.17.0):
-    - TensorFlowLiteC (= 2.17.0)
-    - TensorFlowLiteSwift/Privacy (= 2.17.0)
-  - TensorFlowLiteSwift/Privacy (2.17.0)
-  - tflite_flutter (0.1.0):
+  - TensorFlowLiteC (2.12.0):
+    - TensorFlowLiteC/Core (= 2.12.0)
+  - TensorFlowLiteC/Core (2.12.0)
+  - TensorFlowLiteC/CoreML (2.12.0):
+    - TensorFlowLiteC/Core
+  - TensorFlowLiteC/Metal (2.12.0):
+    - TensorFlowLiteC/Core
+  - TensorFlowLiteSwift (2.12.0):
+    - TensorFlowLiteSwift/Core (= 2.12.0)
+  - TensorFlowLiteSwift/Core (2.12.0):
+    - TensorFlowLiteC (= 2.12.0)
+  - TensorFlowLiteSwift/CoreML (2.12.0):
+    - TensorFlowLiteC/CoreML (= 2.12.0)
+    - TensorFlowLiteSwift/Core (= 2.12.0)
+  - TensorFlowLiteSwift/Metal (2.12.0):
+    - TensorFlowLiteC/Metal (= 2.12.0)
+    - TensorFlowLiteSwift/Core (= 2.12.0)
+  - tflite_flutter (0.0.1):
     - Flutter
-  - tflite_flutter_helper (0.0.1):
-    - Flutter
+    - TensorFlowLiteSwift (= 2.12.0)
+    - TensorFlowLiteSwift/CoreML (= 2.12.0)
+    - TensorFlowLiteSwift/Metal (= 2.12.0)
 
 DEPENDENCIES:
-  - audioplayers (from `.symlinks/plugins/audioplayers/ios`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - Flutter (from `Flutter`)
   - GoogleMLKit/FaceDetection
-  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - TensorFlowLiteSwift
   - tflite_flutter (from `.symlinks/plugins/tflite_flutter/ios`)
-  - tflite_flutter_helper (from `.symlinks/plugins/tflite_flutter_helper/ios`)
 
 SPEC REPOS:
   trunk:
@@ -99,21 +100,14 @@ SPEC REPOS:
     - TensorFlowLiteSwift
 
 EXTERNAL SOURCES:
-  audioplayers:
-    :path: ".symlinks/plugins/audioplayers/ios"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
   Flutter:
     :path: Flutter
-  path_provider_foundation:
-    :path: ".symlinks/plugins/path_provider_foundation/darwin"
   tflite_flutter:
     :path: ".symlinks/plugins/tflite_flutter/ios"
-  tflite_flutter_helper:
-    :path: ".symlinks/plugins/tflite_flutter_helper/ios"
 
 SPEC CHECKSUMS:
-  audioplayers: 455322b54050b30ea4b1af7cd9e9d105f74efa8c
   camera_avfoundation: dd002b0330f4981e1bbcb46ae9b62829237459a4
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   GoogleDataTransport: 6c09b596d841063d76d4288cc2d2f42cc36e1e2a
@@ -127,12 +121,10 @@ SPEC CHECKSUMS:
   MLKitFaceDetection: 7c0e8bf09ddd27105da32d088fca978a99fc30cc
   MLKitVision: e858c5f125ecc288e4a31127928301eaba9ae0c1
   nanopb: 438bc412db1928dac798aa6fd75726007be04262
-  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
-  TensorFlowLiteC: eac6d689a8d391d1b202dc59e3d9165ba64aaf73
-  TensorFlowLiteSwift: 723fe42222815e72490c79feeff05305530de393
-  tflite_flutter: 9157a660578930a99728974f247369af1c3595d5
-  tflite_flutter_helper: 543b46b6bd064b21c92ea6e54bc0b29f1ce74cb5
+  TensorFlowLiteC: 20785a69299185a379ba9852b6625f00afd7984a
+  TensorFlowLiteSwift: 3a4928286e9e35bdd3e17970f48e53c80d25e793
+  tflite_flutter: 9433d086a3060431bbc9f3c7c20d017db0e72d08
 
 PODFILE CHECKSUM: 37fb08ae998b6e840716d084bbce025c7b5436e5
 
