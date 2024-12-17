@@ -4,18 +4,12 @@ import 'package:camera/camera.dart';
 import 'mediapipe_channel.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
-import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
-import 'package:driver_drownsiness_detection/camera_service.dart';
 import 'dart:async';
 
 final TFLiteService _tfliteService = TFLiteService();
-final CameraService _cameraService = CameraService();
+// final CameraService _cameraService = CameraService();
 List<CameraDescription> cameras = [];
-
-String interpretOutput(List<dynamic> output) {
-  return output[0] == 1 ? "Drowsy" : "Alert";
-}
 
 
 Future<void> main() async {
@@ -24,11 +18,11 @@ Future<void> main() async {
   cameras = await availableCameras();
   // Load TensorFlow Lite model
   await _tfliteService.loadModel();
-  try {
-    await _cameraService.initialize(); // Initialize the camera
-  } catch (e) {
-    print("Error initializing camera: $e");
-  }
+  // try {
+  //   await _cameraService.initialize(); // Initialize the camera
+  // } catch (e) {
+  //   print("Error initializing camera: $e");
+  // }
   runApp(MyApp());
 }
 
@@ -71,40 +65,126 @@ class CameraPreviewScreen extends StatefulWidget {
 }
 
 class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
-  late CameraController _controller;
+  late CameraController _cameraController;
   late Future<void> _initializeControllerFuture;
+  bool _isInitialized = false; // Add flag to track initialization
+  bool _isCapturing = false; // Add a flag to manage concurrent captures
   String detectionResult = 'No Result';
   Timer? _timer;
+  DateTime? _lastDetectionTime; // Track the last detection time
+  bool _isProcessingFrame = false; // Prevent overlapping frame processing
 
 
   @override
   void initState() {
     super.initState();
+    initializeCamera();
 
     // Find the front camera from the list of available cameras
-    CameraDescription? frontCamera;
-    for (var camera in cameras) {
-      if (camera.lensDirection == CameraLensDirection.front) {
-        frontCamera = camera;
-        break;
+    // CameraDescription? frontCamera;
+    // for (var camera in cameras) {
+    //   if (camera.lensDirection == CameraLensDirection.front) {
+    //     frontCamera = camera;
+    //     break;
+    //   }
+    // }
+    //
+    // // Initialize the controller with the front camera
+    // if (frontCamera != null) {
+    //   _controller = CameraController(frontCamera, ResolutionPreset.medium, enableAudio: false);
+    //   _initializeControllerFuture = _controller.initialize();
+    // } else {
+    //   // Handle case where no front camera is found
+    //   print('Front camera not available');
+    // }
+  }
+
+  Future<void> initializeCamera() async {
+    final cameras = await availableCameras();
+    // Select the front camera
+    final frontCamera = cameras.firstWhere(
+          (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => throw Exception("No front camera found!"),
+    );
+    _cameraController = CameraController(
+        frontCamera,
+        ResolutionPreset.medium,
+        enableAudio: false
+    );
+    await _cameraController.initialize();
+    _isInitialized = true; // Set flag to true after initialization
+    _cameraController!.startImageStream(processCameraFrame);
+  }
+
+  // Process frames from the camera
+  void processCameraFrame(CameraImage image) async {
+    final now = DateTime.now();
+
+    if (_lastDetectionTime != null && now.difference(_lastDetectionTime!) < Duration(seconds: 3)) {
+      return;
+    }
+    if (_isProcessingFrame) return;
+
+    try {
+      _isProcessingFrame = true;
+      _lastDetectionTime = now;
+
+      // Convert BGRA8888 to TensorFlow Lite compatible RGB format
+      Uint8List rgbBytes = preprocessBGRAImage(image.planes[0].bytes, image.width, image.height);
+
+      // Run inference on the processed image
+      String result = detectDrowsiness(rgbBytes);
+
+      // Update the UI
+      setState(() {
+        detectionResult = result;
+      });
+
+      print("Detection Result: $result");
+    } catch (e) {
+      print("Error processing frame: $e");
+    } finally {
+      _isProcessingFrame = false;
+    }
+  }
+
+
+
+  Uint8List convertBGRA8888ToUint8List(CameraImage image) {
+    return image.planes[0].bytes; // BGRA8888 is stored in the first plane
+  }
+
+  Uint8List preprocessBGRAImage(Uint8List bgraBytes, int width, int height) {
+    // Create an empty RGB image
+    img.Image rgbImage = img.Image(width, height);
+
+    // Convert BGRA8888 to RGB
+    int byteIndex = 0;
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final b = bgraBytes[byteIndex++];
+        final g = bgraBytes[byteIndex++];
+        final r = bgraBytes[byteIndex++];
+        final a = bgraBytes[byteIndex++]; // Skip alpha (not used)
+
+        // Set pixel in the RGB image
+        rgbImage.setPixel(x, y, img.getColor(r, g, b));
       }
     }
 
-    // Initialize the controller with the front camera
-    if (frontCamera != null) {
-      _controller = CameraController(frontCamera, ResolutionPreset.high);
-      _initializeControllerFuture = _controller.initialize();
-    } else {
-      // Handle case where no front camera is found
-      print('Front camera not available');
-    }
+    // Resize the image to the model's input size (e.g., 224x224)
+    img.Image resizedImage = img.copyResize(rgbImage, width: 224, height: 224);
+
+    // Encode the resized image as a byte array (JPG or PNG)
+    return Uint8List.fromList(img.encodeJpg(resizedImage));
   }
+
 
   @override
   void dispose() {
     _timer?.cancel();
-    _controller.dispose();
-    _cameraService.dispose();
+    _cameraController.dispose();
+    // _cameraService.dispose();
     _tfliteService.close();
     super.dispose();
   }
@@ -115,7 +195,14 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     });
   }
 
-  String detectDrowsiness(Uint8List imageBytes){
+  // Run inference on the TensorFlow Lite model
+  String detectDrowsiness(Uint8List inputBytes) {
+    final preprocessedImage = _tfliteService.preprocessImage(inputBytes);
+    final List<dynamic> output = _tfliteService.runModel(preprocessedImage.buffer.asUint8List());
+    return _tfliteService.interpretOutput(output);
+  }
+
+  String oldDetectDrowsiness(Uint8List imageBytes){
     var result = _tfliteService.runModel(imageBytes);
     print("Detection Result: $result");
 
@@ -137,33 +224,34 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     List<dynamic> output = _tfliteService.runModel(inputImage.buffer.asUint8List());
 
     // Interpret the output
-    String prediction = interpretOutput(output);
+    String prediction = _tfliteService.interpretOutput(output);
     print("Prediction: $prediction");
-    return interpretOutput(output);
+    return _tfliteService.interpretOutput(output);
   }
 
   // Start periodic detection
-  void startDetection() {
-    _timer = Timer.periodic(Duration(seconds: 2), (timer) async {
-      try {
-        // Capture a frame from the camera
-        Uint8List imageBytes = await _cameraService.captureImage();
-
-        // Run inference using the TensorFlow Lite model
-        String result = detectDrowsiness(imageBytes);
-
-        // Update the detection result on the UI
-        setState(() {
-          detectionResult = result;
-        });
-
-        print("Detection Result: $result");
-      } catch (e) {
-        // Log the error and continue without crashing the app
-        print("Error during detection: $e");
-      }
-    });
-  }
+  // void startDetection() {
+  //   _timer = Timer.periodic(Duration(seconds: 3), (timer) async {
+  //     try {
+  //       // Capture a frame from the camera
+  //       Uint8List imageBytes = await _cameraService.captureImage();
+  //
+  //       // Run inference using the TensorFlow Lite model
+  //       // Run inference using the TensorFlow Lite model
+  //       String result = detectDrowsiness(imageBytes);
+  //
+  //       // Update the detection result on the UI
+  //       setState(() {
+  //         detectionResult = result;
+  //       });
+  //
+  //       print("Detection Result: $result");
+  //     } catch (e) {
+  //       // Log the error and continue without crashing the app
+  //       print("Error during detection: $e");
+  //     }
+  //   });
+  // }
 
 
   // void _processImage() async {
@@ -176,7 +264,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   void _captureFrame() async {
     try {
       // Capture the current frame
-      final image = await _controller.takePicture();
+      final image = await _cameraController.takePicture();
 
       // Send the image path to the native side via platform channel
       String result = await MediaPipeChannel.processImageWithPath(image.path);
@@ -197,32 +285,41 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       body:
       Column(
         children: [
-          FutureBuilder(future: _cameraService.initialize(), builder: (context, snapshot){
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text("Error initializing camera"));
-            } else {
-              return CameraPreview(_cameraService.controller); // Show preview
-            }
-          },
+          // FutureBuilder(future: _cameraService.initialize(), builder: (context, snapshot){
+          //   if (snapshot.connectionState == ConnectionState.waiting) {
+          //     return Center(child: CircularProgressIndicator());
+          //   } else if (snapshot.hasError) {
+          //     return Center(child: Text("Error initializing camera"));
+          //   } else {
+          //     return CameraPreview(_cameraService.controller); // Show preview
+          //   }
+          // },
+          if (_cameraController != null && _cameraController!.value.isInitialized)
+            Expanded(child: CameraPreview(_cameraController!))
+          else
+            Center(child: CircularProgressIndicator()),
+          SizedBox(height: 20),
+          Text(
+            "Detection Result: $detectionResult",
+            style: TextStyle(fontSize: 24),
           ),
-          ElevatedButton(
-            onPressed: startDetection,
-            child: Text("Start"),
-          ),
-          Expanded(
-            child: FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return CameraPreview(_controller);
-                } else {
-                  return Center(child: CircularProgressIndicator());
-                }
-              },
-            ),
-          ),
+          SizedBox(height: 20),
+          // ElevatedButton(
+          //   onPressed: startDetection,
+          //   child: Text("Start"),
+          // ),
+          // Expanded(
+          //   child: FutureBuilder<void>(
+          //     future: _initializeControllerFuture,
+          //     builder: (context, snapshot) {
+          //       if (snapshot.connectionState == ConnectionState.done) {
+          //         return CameraPreview(_cameraController);
+          //       } else {
+          //         return Center(child: CircularProgressIndicator());
+          //       }
+          //     },
+          //   ),
+          // ),
           if (detectionResult.isNotEmpty)
             Container(
               color: detectionResult.contains("Drowsiness") ? Colors.red : Colors.green,
@@ -242,21 +339,21 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               ),
             ),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                Uint8List imageBytes = await _cameraService.captureImage();
-                print("Image captured successfully!");
-                String result = detectDrowsiness(imageBytes);
-                updateResult(result);
-                // Add code to process or display the image
-              } catch (e) {
-              print("Error capturing image: $e");
-              }
-              // Capture image and run inference
-            },
-            child: Text('Detect Drowsiness'),
-          ),
+          // ElevatedButton(
+          //   onPressed: () async {
+          //     try {
+          //       Uint8List imageBytes = await _cameraService.captureImage();
+          //       print("Image captured successfully!");
+          //       String result = detectDrowsiness(imageBytes);
+          //       updateResult(result);
+          //       // Add code to process or display the image
+          //     } catch (e) {
+          //     print("Error capturing image: $e");
+          //     }
+          //     // Capture image and run inference
+          //   },
+          //   child: Text('Detect Drowsiness'),
+          // ),
         ],
       ),
     );

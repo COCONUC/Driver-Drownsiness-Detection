@@ -1,5 +1,5 @@
 PODS:
-  - audioplayers (0.0.1):
+  - audioplayers_darwin (0.0.1):
     - Flutter
   - camera_avfoundation (0.0.1):
     - Flutter
@@ -72,7 +72,7 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
-  - audioplayers (from `.symlinks/plugins/audioplayers/ios`)
+  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/ios`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - Flutter (from `Flutter`)
   - GoogleMLKit/FaceDetection
@@ -99,8 +99,8 @@ SPEC REPOS:
     - TensorFlowLiteSwift
 
 EXTERNAL SOURCES:
-  audioplayers:
-    :path: ".symlinks/plugins/audioplayers/ios"
+  audioplayers_darwin:
+    :path: ".symlinks/plugins/audioplayers_darwin/ios"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
   Flutter:
@@ -113,7 +113,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/tflite_flutter_helper/ios"
 
 SPEC CHECKSUMS:
-  audioplayers: 455322b54050b30ea4b1af7cd9e9d105f74efa8c
+  audioplayers_darwin: 877d9a4d06331c5c374595e46e16453ac7eafa40
   camera_avfoundation: dd002b0330f4981e1bbcb46ae9b62829237459a4
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   GoogleDataTransport: 6c09b596d841063d76d4288cc2d2f42cc36e1e2a

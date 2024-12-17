@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 
 class CameraService{
-  late CameraController _controller;
+  late CameraController _cameraController;
   bool _isInitialized = false; // Add flag to track initialization
   bool _isCapturing = false; // Add a flag to manage concurrent captures
 
@@ -15,11 +15,12 @@ class CameraService{
     (camera) => camera.lensDirection == CameraLensDirection.front,
     orElse: () => throw Exception("No front camera found!"),
     );
-    _controller = CameraController(
+    _cameraController = CameraController(
       frontCamera,
       ResolutionPreset.medium,
+      enableAudio: false
     );
-    await _controller.initialize();
+    await _cameraController.initialize();
     _isInitialized = true; // Set flag to true after initialization
   }
 
@@ -34,7 +35,7 @@ class CameraService{
 
     try {
       _isCapturing = true; // Set capturing flag
-      final XFile file = await _controller.takePicture();
+      final XFile file = await _cameraController.takePicture();
       return await file.readAsBytes();
     } catch (e) {
       print("Error capturing image: $e");
@@ -48,10 +49,10 @@ class CameraService{
     if (!_isInitialized) {
       throw Exception("Camera is not initialized. Call initialize() first.");
     }
-    return _controller;
+    return _cameraController;
   }
 
   void dispose() {
-    _controller.dispose();
+    _cameraController.dispose();
   }
 }

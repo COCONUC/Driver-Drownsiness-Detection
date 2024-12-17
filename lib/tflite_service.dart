@@ -33,9 +33,7 @@ class TFLiteService {
   void close() {
     _interpreter.close();
   }
-}
 
-class InputProcessor {
   TensorImage preprocessImage(Uint8List imageData) {
     // Decode image using the 'image' package
     img.Image? decodedImage = img.decodeImage(imageData);
@@ -54,6 +52,34 @@ class InputProcessor {
 
     return imageProcessor.process(tensorImage);
   }
+
+  String interpretOutput(List<dynamic> output) {
+    return output[0] == 1 ? "Drowsy" : "Alert";
+  }
+
+}
+
+class InputProcessor {
+
+  TensorImage preprocessImage(Uint8List imageData) {
+    // Decode image using the 'image' package
+    img.Image? decodedImage = img.decodeImage(imageData);
+    if (decodedImage == null) {
+      throw Exception("Failed to decode image.");
+    }
+
+    // Convert decoded image to TensorImage
+    TensorImage tensorImage = TensorImage.fromImage(decodedImage);
+
+    // Create an ImageProcessor with resize and normalization steps
+    var imageProcessor = ImageProcessorBuilder()
+        .add(ResizeOp(224, 224, ResizeMethod.BILINEAR)) // Resize to model input size
+        .add(NormalizeOp(0, 255)) // Normalize pixel values to [0, 1]
+        .build();
+
+    return imageProcessor.process(tensorImage);
+  }
+
 
   // TensorImage preprocessImage(TensorImage inputImage) {
   //   var imageProcessor = ImageProcessorBuilder()
