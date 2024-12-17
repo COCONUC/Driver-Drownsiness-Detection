@@ -132,7 +132,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       // Convert BGRA8888 to TensorFlow Lite compatible RGB format
       Uint8List rgbBytes = preprocessBGRAImage(image.planes[0].bytes, image.width, image.height);
 
-      // Run inference on the processed image
+      // Run inference
       String result = detectDrowsiness(rgbBytes);
 
       // Update the UI
@@ -196,10 +196,16 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
   // Run inference on the TensorFlow Lite model
+  // String detectDrowsiness(Uint8List inputBytes) {
+  //   final preprocessedImage = _tfliteService.preprocessImage(inputBytes);
+  //   final List<dynamic> output = _tfliteService.runModel(preprocessedImage.buffer.asUint8List());
+  //   return _tfliteService.interpretOutput(output);
+  // }
+
+  // Run inference on the TensorFlow Lite model
   String detectDrowsiness(Uint8List inputBytes) {
-    final preprocessedImage = _tfliteService.preprocessImage(inputBytes);
-    final List<dynamic> output = _tfliteService.runModel(preprocessedImage.buffer.asUint8List());
-    return _tfliteService.interpretOutput(output);
+    final result = _tfliteService.runModel(inputBytes);
+    return result == 1 ? "Drowsy" : "Alert";
   }
 
   String oldDetectDrowsiness(Uint8List imageBytes){

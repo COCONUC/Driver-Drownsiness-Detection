@@ -6,7 +6,7 @@ import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 class TFLiteService {
   late Interpreter _interpreter;
 
-  // Load the model
+  // Load the model once during initialization
   Future<void> loadModel() async {
     try {
       _interpreter = await Interpreter.fromAsset('models/drowsiness_detection_model.tflite');
@@ -16,23 +16,26 @@ class TFLiteService {
     }
   }
 
-  // Run inference
+  // Run inference synchronously
   List<dynamic> runModel(Uint8List inputData) {
-    var input = inputData; // Input data preprocessed
+    var input = inputData; // Input must match model requirements
     var output = List.filled(1, 0).reshape([1]); // Output placeholder
 
     try {
       _interpreter.run(input, output);
+      print("Inference Output: $output");
+      return output[0];
     } catch (e) {
       print("Error running model: $e");
+      return ["Error"];
     }
-
-    return output;
   }
 
+  // Close the interpreter safely
   void close() {
     _interpreter.close();
   }
+
 
   TensorImage preprocessImage(Uint8List imageData) {
     // Decode image using the 'image' package
