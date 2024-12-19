@@ -1,5 +1,6 @@
 import UIKit
 import Flutter
+import MLKitCommon
 import MLKitFaceDetection
 import MLKitVision
 

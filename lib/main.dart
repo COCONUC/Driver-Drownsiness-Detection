@@ -1,10 +1,11 @@
 import 'package:driver_drownsiness_detection/tflite_service.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:google_ml_kit/google_ml_kit.dart';
+import 'bounding_box.dart';
 import 'mediapipe_channel.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
-import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 import 'dart:async';
 
 final TFLiteService _tfliteService = TFLiteService();
@@ -74,6 +75,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   DateTime? _lastDetectionTime; // Track the last detection time
   bool _isProcessingFrame = false; // Prevent overlapping frame processing
   bool isDetecting = false; // Flag to control detection
+  Rect? boundingBox; // Bounding box for the detected face
+  int imageWidth = 224; // Default width of the image (update dynamically if needed)
+  int imageHeight = 224; // Default height of the image (update dynamically if needed)
 
 
   @override
@@ -199,18 +203,27 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       _isProcessingFrame = true;
       _lastDetectionTime = now;
 
-      // Convert BGRA8888 to TensorFlow Lite compatible RGB format
-      Uint8List rgbBytes = preprocessBGRAImage(image.planes[0].bytes, image.width, image.height);
-
-      // Run inference
-      String result = detectDrowsiness(rgbBytes);
-
-      // Update the UI
+      // Update image dimensions dynamically
       setState(() {
-        detectionResult = result;
+        imageWidth = image.width;
+        imageHeight = image.height;
       });
 
-      print("Detection Result: $result");
+      // Use MediaPipe for face detection
+      Uint8List bgraBytes = image.planes[0].bytes;
+      Rect? detectedBox = await detectFace(bgraBytes);
+
+      if (detectedBox != null) {
+        setState(() {
+          boundingBox = detectedBox;
+          detectionResult = "Face Detected";
+        });
+      } else {
+        setState(() {
+          boundingBox = null;
+          detectionResult = "No Face Detected";
+        });
+      }
     } catch (e) {
       print("Error processing frame: $e");
     } finally {
@@ -220,12 +233,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
 
 
+
+
   Uint8List convertBGRA8888ToUint8List(CameraImage image) {
     return image.planes[0].bytes; // BGRA8888 is stored in the first plane
   }
 
-  // Preprocess BGRA8888 to 224x224 Float32 Tensor Input
-  // Preprocess BGRA8888 to 224x224 Float32 Tensor Input
   // Preprocess BGRA8888 to 224x224 Float32 Tensor Input
   Uint8List preprocessBGRAImage(Uint8List bgraBytes, int width, int height) {
     // Convert BGRA8888 to RGB
@@ -266,78 +279,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     });
   }
 
-  // Run inference on the TensorFlow Lite model
-  // String detectDrowsiness(Uint8List inputBytes) {
-  //   final preprocessedImage = _tfliteService.preprocessImage(inputBytes);
-  //   final List<dynamic> output = _tfliteService.runModel(preprocessedImage.buffer.asUint8List());
-  //   return _tfliteService.interpretOutput(output);
-  // }
-
   // Run TensorFlow Lite inference
   String detectDrowsiness(Uint8List inputBytes) {
     final result = _tfliteService.runModel(inputBytes);
     double value = result[0];
     return value > 0.5 ? "Drowsy" : "Alert";
   }
-
-  String oldDetectDrowsiness(Uint8List imageBytes){
-    var result = _tfliteService.runModel(imageBytes);
-    print("Detection Result: $result");
-
-    // Check the type of result and handle appropriately
-    if (result is int) {
-      print("Result is an integer: $result");
-    } else if (result is List) {
-      print("Result is a list: $result");
-    } else {
-      print("Unknown result type: ${result.runtimeType}");
-    }
-
-    final InputProcessor processor = InputProcessor();
-
-    // Preprocess the input image
-    TensorImage inputImage = processor.preprocessImage(imageBytes);
-
-    // Perform inference
-    List<dynamic> output = _tfliteService.runModel(inputImage.buffer.asUint8List());
-
-    // Interpret the output
-    String prediction = _tfliteService.interpretOutput(output);
-    print("Prediction: $prediction");
-    return _tfliteService.interpretOutput(output);
-  }
-
-  // Start periodic detection
-  // void startDetection() {
-  //   _timer = Timer.periodic(Duration(seconds: 3), (timer) async {
-  //     try {
-  //       // Capture a frame from the camera
-  //       Uint8List imageBytes = await _cameraService.captureImage();
-  //
-  //       // Run inference using the TensorFlow Lite model
-  //       // Run inference using the TensorFlow Lite model
-  //       String result = detectDrowsiness(imageBytes);
-  //
-  //       // Update the detection result on the UI
-  //       setState(() {
-  //         detectionResult = result;
-  //       });
-  //
-  //       print("Detection Result: $result");
-  //     } catch (e) {
-  //       // Log the error and continue without crashing the app
-  //       print("Error during detection: $e");
-  //     }
-  //   });
-  // }
-
-
-  // void _processImage() async {
-  //   String result = await MediaPipeChannel.processImage();
-  //   setState(() {
-  //     detectionResult = result; // Use this to update the UI accordingly
-  //   });
-  // }
 
   void _captureFrame() async {
     try {
@@ -354,6 +301,78 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     }
   }
 
+
+
+
+  Future<Rect?> detectFace(Uint8List imageBytes) async {
+    final faceDetector = GoogleMlKit.vision.faceDetector();
+    final inputImage = InputImage.fromBytes(
+      bytes: imageBytes,
+      inputImageData: InputImageData(
+        size: Size(224, 224), // Replace with actual image size
+        inputImageFormat: InputImageFormat.BGRA8888, // Specify image format
+        planeData: [
+          InputImagePlaneMetadata(
+            bytesPerRow: 224 * 4, // 4 bytes per pixel for BGRA8888
+            height: 224,
+            width: 224,
+          )
+        ],
+        imageRotation: InputImageRotation.Rotation_0deg, // Corrected enum constant
+      ),
+    );
+
+    final faces = await faceDetector.processImage(inputImage);
+
+    if (faces.isNotEmpty) {
+      final face = faces.first;
+      faceDetector.close();
+      return face.boundingBox; // Return the bounding box of the detected face
+    }
+
+    faceDetector.close();
+    return null; // No face detected
+  }
+
+  // Function to crop the detected face and preprocess it for TensorFlow Lite
+  Uint8List cropAndPreprocessFace(
+      Uint8List imageBytes,
+      Rect boundingBox,
+      int originalWidth,
+      int originalHeight,
+      ) {
+    // Decode the image
+    final rawImage = img.decodeImage(imageBytes);
+
+    // Crop the face using bounding box
+    final faceCrop = img.copyCrop(
+      rawImage!,
+      boundingBox.left.toInt(),
+      boundingBox.top.toInt(),
+      boundingBox.width.toInt(),
+      boundingBox.height.toInt(),
+    );
+
+    // Resize to model input size (224x224)
+    final resizedFace = img.copyResize(faceCrop, width: 224, height: 224);
+
+    // Normalize pixel values to [0, 1]
+    List<double> normalizedPixels = [];
+    for (var pixel in resizedFace.data) {
+      normalizedPixels.add((img.getRed(pixel) / 255.0)); // Red channel
+      normalizedPixels.add((img.getGreen(pixel) / 255.0)); // Green channel
+      normalizedPixels.add((img.getBlue(pixel) / 255.0)); // Blue channel
+    }
+
+    // Convert to Float32List for TensorFlow Lite input
+    return Float32List.fromList(normalizedPixels).buffer.asUint8List();
+  }
+
+
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -363,23 +382,25 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       body:
       Column(
         children: [
-          // FutureBuilder(future: _cameraService.initialize(), builder: (context, snapshot){
-          //   if (snapshot.connectionState == ConnectionState.waiting) {
-          //     return Center(child: CircularProgressIndicator());
-          //   } else if (snapshot.hasError) {
-          //     return Center(child: Text("Error initializing camera"));
-          //   } else {
-          //     return CameraPreview(_cameraService.controller); // Show preview
-          //   }
-          // },
-          if (_cameraController != null && _cameraController!.value.isInitialized)
+          /*if (_cameraController != null && _cameraController!.value.isInitialized)
             Expanded(child: CameraPreview(_cameraController!))
           else
-            Center(child: CircularProgressIndicator()),
-          SizedBox(height: 20),
-          Text(
-            "Detection Result: $detectionResult",
-            style: TextStyle(fontSize: 24),
+            Center(child: CircularProgressIndicator()),*/
+          if (_cameraController != null && _cameraController!.value.isInitialized)
+            CameraPreview(_cameraController!),
+          if (boundingBox != null)
+            CustomPaint(
+              painter: FaceBoundingBoxPainter(
+                boundingBox: boundingBox!,
+                imageSize: Size(imageWidth.toDouble(), imageHeight.toDouble()),
+              ),
+            ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Text(
+              "Detection Result: $detectionResult",
+              style: TextStyle(fontSize: 24, color: Colors.white),
+            ),
           ),
           SizedBox(height: 20),
           // Start/Stop Detection Button
@@ -394,25 +415,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
             },
             child: Text(isDetecting ? "Stop Detection" : "Start Detection"),
           ),
-          // ElevatedButton(
-          //   onPressed: startDetection,
-          //   child: Text("Start"),
-          // ),
-          // Expanded(
-          //   child: FutureBuilder<void>(
-          //     future: _initializeControllerFuture,
-          //     builder: (context, snapshot) {
-          //       if (snapshot.connectionState == ConnectionState.done) {
-          //         return CameraPreview(_cameraController);
-          //       } else {
-          //         return Center(child: CircularProgressIndicator());
-          //       }
-          //     },
-          //   ),
-          // ),
           if (detectionResult.isNotEmpty)
             Container(
-              color: detectionResult.contains("Drowsiness") ? Colors.red : Colors.green,
+              color: detectionResult.contains("Drowsy") ? Colors.red : Colors.green,
               height: 50,
               child: Center(
                 child: Text(
@@ -448,92 +453,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       ),
     );
   }
+
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
-    );
-  }
-}

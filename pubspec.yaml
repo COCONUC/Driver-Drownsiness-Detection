@@ -35,6 +35,7 @@ dependencies:
   tflite_flutter_helper: ^0.3.0
   image: ^3.3.0
   audioplayers: ^6.1.0 # For sound alerts
+  google_ml_kit: ^0.6.0
 
 
   # The following adds the Cupertino Icons font to your application.
