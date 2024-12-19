@@ -11,22 +11,28 @@ class FaceBoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    print("CustomPaint size: $size");
+    print("Drawing bounding box: $boundingBox on screen size: $size with image size: $imageSize");
+
     final paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke;
 
-    // Scale the bounding box to fit the screen
-    final rect = Rect.fromLTRB(
-      boundingBox.left * size.width / imageSize.width,
-      boundingBox.top * size.height / imageSize.height,
-      boundingBox.right * size.width / imageSize.width,
-      boundingBox.bottom * size.height / imageSize.height,
+    // Scale bounding box to fit the screen
+    final double scaleX = size.width / imageSize.width;
+    final double scaleY = size.height / imageSize.height;
+
+    final scaledRect = Rect.fromLTRB(
+      boundingBox.left * scaleX,
+      boundingBox.top * scaleY,
+      boundingBox.right * scaleX,
+      boundingBox.bottom * scaleY,
     );
 
-    // Draw the bounding box
-    canvas.drawRect(rect, paint);
+    canvas.drawRect(scaledRect, paint);
   }
+
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {

@@ -71,6 +71,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool _isInitialized = false; // Add flag to track initialization
   bool _isCapturing = false; // Add a flag to manage concurrent captures
   String detectionResult = 'No Result';
+  String faceDetectionResult = 'No Result';
   Timer? _detectionTimer;
   DateTime? _lastDetectionTime; // Track the last detection time
   bool _isProcessingFrame = false; // Prevent overlapping frame processing
@@ -162,6 +163,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           image.height,
         );
 
+        processCameraFrame(image);
+
         // Run inference
         String result = detectDrowsiness(inputBytes);
 
@@ -192,6 +195,57 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   // Process frames from the camera
   void processCameraFrame(CameraImage image) async {
+    print("Processing camera frame...");
+    final now = DateTime.now();
+
+    if (_lastDetectionTime != null && DateTime.now().difference(_lastDetectionTime!) < Duration(milliseconds: 500)) {
+      print("Skipping frame: too soon after last detection.");
+      return;
+    }
+
+    try {
+      _isProcessingFrame = true;
+      _lastDetectionTime = now;
+
+      // Update image dimensions dynamically
+      setState(() {
+        imageWidth = image.width;
+        imageHeight = image.height;
+      });
+
+      print("Image Width: $imageWidth, Image Height: $imageHeight");
+
+      // Use MediaPipe for face detection
+      Uint8List bgraBytes = image.planes[0].bytes;
+      Rect? detectedBox = await detectFace(bgraBytes);
+
+      if (detectedBox != null) {
+        setState(() {
+          boundingBox = detectedBox;
+          faceDetectionResult = "Face Detected";
+        });
+        print("Bounding Box Detected: $boundingBox");
+      } else {
+        setState(() {
+          boundingBox = null;
+          faceDetectionResult = "No Face Detected";
+        });
+      }
+    } catch (e) {
+      print("Error processing frame: $e");
+    } finally {
+      _isProcessingFrame = false;
+    }
+  }
+
+
+
+
+
+
+
+
+  void oldProcessCameraFrame(CameraImage image) async {
     final now = DateTime.now();
 
     if (_lastDetectionTime != null && now.difference(_lastDetectionTime!) < Duration(seconds: 3)) {
@@ -216,13 +270,15 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       if (detectedBox != null) {
         setState(() {
           boundingBox = detectedBox;
-          detectionResult = "Face Detected";
+          faceDetectionResult = "Face Detected";
         });
+        print("Bounding Box Detected: $boundingBox");
       } else {
         setState(() {
           boundingBox = null;
-          detectionResult = "No Face Detected";
+          faceDetectionResult = "No Face Detected";
         });
+        print("No face detected.");
       }
     } catch (e) {
       print("Error processing frame: $e");
@@ -286,25 +342,56 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     return value > 0.5 ? "Drowsy" : "Alert";
   }
 
-  void _captureFrame() async {
-    try {
-      // Capture the current frame
-      final image = await _cameraController?.takePicture();
 
-      // Send the image path to the native side via platform channel
-      String result = await MediaPipeChannel.processImageWithPath(image!.path);
-      setState(() {
-        detectionResult = result;
-      });
-    } catch (e) {
-      print('Error capturing frame: $e');
+
+  Future<Rect?> detectFace(Uint8List imageBytes) async {
+    print("Running face detection...");
+    print("Image Width: $imageWidth, Image Height: $imageHeight");
+    print("Input Image Bytes Length: ${imageBytes.length}");
+    final faceDetector = GoogleMlKit.vision.faceDetector(FaceDetectorOptions(
+      enableClassification: true, // Enables "smiling" and "eye open" probability
+      enableLandmarks: true, // Enables landmark detection (e.g., eyes, nose, mouth)
+      enableTracking: true, // Enables tracking of unique faces
+    ));
+    final inputImage = InputImage.fromBytes(
+      bytes: imageBytes,
+      inputImageData: InputImageData(
+        size: Size(480, 640), // Ensure it matches Image Width and Height
+        imageRotation: InputImageRotation.Rotation_0deg, // Ensure correct rotation
+        inputImageFormat: InputImageFormat.BGRA8888,
+        planeData: [
+          InputImagePlaneMetadata(
+            bytesPerRow: 1920, // 480 (width) * 4 (bytes per pixel for BGRA8888)
+            height: 640,
+            width: 480,
+          )
+        ],
+      ),
+    );
+
+    final faces = await faceDetector.processImage(inputImage);
+    print("Faces detected: ${faces.length}");
+
+    if (faces.isNotEmpty) {
+      for (var face in faces) {
+        print("Face bounding box: ${face.boundingBox}");
+        print("Smiling probability: ${face.smilingProbability}");
+        print("Left eye open probability: ${face.leftEyeOpenProbability}");
+        print("Right eye open probability: ${face.rightEyeOpenProbability}");
+      }
+      return faces.first.boundingBox;
+    } else {
+      print("No face detected.");
     }
+
+    return null;
   }
 
 
 
 
-  Future<Rect?> detectFace(Uint8List imageBytes) async {
+  Future<Rect?> oldDetectFace(Uint8List imageBytes) async {
+    print("Running face detection...");
     final faceDetector = GoogleMlKit.vision.faceDetector();
     final inputImage = InputImage.fromBytes(
       bytes: imageBytes,
@@ -323,6 +410,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     );
 
     final faces = await faceDetector.processImage(inputImage);
+
+    print("Faces detected: ${faces.length}");
 
     if (faces.isNotEmpty) {
       final face = faces.first;
@@ -389,17 +478,19 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           if (_cameraController != null && _cameraController!.value.isInitialized)
             CameraPreview(_cameraController!),
           if (boundingBox != null)
-            CustomPaint(
-              painter: FaceBoundingBoxPainter(
-                boundingBox: boundingBox!,
-                imageSize: Size(imageWidth.toDouble(), imageHeight.toDouble()),
+            Positioned.fill(
+              child: CustomPaint(
+                painter: FaceBoundingBoxPainter(
+                  boundingBox: boundingBox!,
+                  imageSize: Size(imageWidth.toDouble(), imageHeight.toDouble()),
+                ),
               ),
             ),
           Align(
             alignment: Alignment.bottomCenter,
             child: Text(
-              "Detection Result: $detectionResult",
-              style: TextStyle(fontSize: 24, color: Colors.white),
+              "Face Detection Result: $faceDetectionResult",
+              style: TextStyle(fontSize: 24, color: Colors.black),
             ),
           ),
           SizedBox(height: 20),
