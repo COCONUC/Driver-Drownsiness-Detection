@@ -19,23 +19,40 @@ class FaceBoundingBoxPainter extends CustomPainter {
       ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke;
 
-    // Scale bounding box to fit the screen
+    // Calculate aspect ratio scaling
     final double scaleX = size.width / imageSize.width;
     final double scaleY = size.height / imageSize.height;
 
-    final scaledRect = Rect.fromLTRB(
-      boundingBox.left * scaleX,
-      boundingBox.top * scaleY,
-      boundingBox.right * scaleX,
-      boundingBox.bottom * scaleY,
+    // Use the smaller scaling factor to maintain aspect ratio
+    final double scale = scaleX < scaleY ? scaleX : scaleY;
+
+    // Adjust bounding box height
+    final double heightAdjustment = 20.0; // Increase height by this value
+    final Rect adjustedBoundingBox = Rect.fromLTRB(
+      boundingBox.left,
+      boundingBox.top - heightAdjustment, // Extend upwards
+      boundingBox.right,
+      boundingBox.bottom + heightAdjustment, // Extend downwards
     );
 
+    // Scale and center the bounding box
+    final double dx = (size.width - imageSize.width * scale) / 2;
+    final double dy = (size.height - imageSize.height * scale) / 2;
+
+    final scaledRect = Rect.fromLTRB(
+      adjustedBoundingBox.left * scale + dx,
+      adjustedBoundingBox.top * scale + dy,
+      adjustedBoundingBox.right * scale + dx,
+      adjustedBoundingBox.bottom * scale + dy,
+    );
+
+    // Draw the scaled bounding box
     canvas.drawRect(scaledRect, paint);
   }
-
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
   }
 }
+

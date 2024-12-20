@@ -198,7 +198,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     print("Processing camera frame...");
     final now = DateTime.now();
 
-    if (_lastDetectionTime != null && DateTime.now().difference(_lastDetectionTime!) < Duration(milliseconds: 500)) {
+    if (_lastDetectionTime != null && DateTime.now().difference(_lastDetectionTime!) < Duration(milliseconds: 3000)) {
       print("Skipping frame: too soon after last detection.");
       return;
     }
@@ -227,9 +227,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         print("Bounding Box Detected: $boundingBox");
       } else {
         setState(() {
-          boundingBox = null;
           faceDetectionResult = "No Face Detected";
         });
+        print("No face detected.");
       }
     } catch (e) {
       print("Error processing frame: $e");
@@ -383,7 +383,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     } else {
       print("No face detected.");
     }
-
     return null;
   }
 
@@ -471,28 +470,28 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       body:
       Column(
         children: [
-          /*if (_cameraController != null && _cameraController!.value.isInitialized)
-            Expanded(child: CameraPreview(_cameraController!))
-          else
-            Center(child: CircularProgressIndicator()),*/
-          if (_cameraController != null && _cameraController!.value.isInitialized)
-            CameraPreview(_cameraController!),
-          if (boundingBox != null)
-            Positioned.fill(
-              child: CustomPaint(
-                painter: FaceBoundingBoxPainter(
-                  boundingBox: boundingBox!,
-                  imageSize: Size(imageWidth.toDouble(), imageHeight.toDouble()),
-                ),
+          Stack(
+            children: [
+        if (_cameraController != null && _cameraController!.value.isInitialized)
+          CameraPreview(_cameraController!),
+        if (boundingBox != null)
+          Positioned.fill( // Ensures CustomPaint fills the available space
+            child: CustomPaint(
+              painter: FaceBoundingBoxPainter(
+                boundingBox: boundingBox!,
+                imageSize: Size(imageWidth.toDouble(), imageHeight.toDouble()),
               ),
             ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Text(
-              "Face Detection Result: $faceDetectionResult",
-              style: TextStyle(fontSize: 24, color: Colors.black),
-            ),
           ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Text(
+            "Face Detection Result: $faceDetectionResult",
+            style: TextStyle(fontSize: 18, color: Colors.black),
+          ),
+        ),
+            ],
+    ),
           SizedBox(height: 20),
           // Start/Stop Detection Button
           ElevatedButton(
