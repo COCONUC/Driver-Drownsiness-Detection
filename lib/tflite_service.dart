@@ -13,7 +13,7 @@ class TFLiteService {
     // var gpuDelegate = GpuDelegateV2();
     // var options = InterpreterOptions()..addDelegate(gpuDelegate);
     try {
-      _interpreter = await Interpreter.fromAsset('models/drowsiness_detection_model.tflite');
+      _interpreter = await Interpreter.fromAsset('models/saved_drowsiness_detection.tflite');
       print("Model loaded successfully!");
     } catch (e) {
       print("Error loading model: $e");
