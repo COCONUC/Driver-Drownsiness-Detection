@@ -11,8 +11,8 @@ class FaceBoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    print("CustomPaint size: $size");
-    print("Drawing bounding box: $boundingBox on screen size: $size with image size: $imageSize");
+    // print("CustomPaint size: $size");
+    // print("Drawing bounding box: $boundingBox on screen size: $size with image size: $imageSize");
 
     final paint = Paint()
       ..color = Colors.red

@@ -213,7 +213,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         imageHeight = image.height;
       });
 
-      print("Image Width: $imageWidth, Image Height: $imageHeight");
+      // print("Image Width: $imageWidth, Image Height: $imageHeight");
 
       // Use MediaPipe for face detection
       Uint8List bgraBytes = image.planes[0].bytes;
@@ -346,8 +346,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   Future<Rect?> detectFace(Uint8List imageBytes) async {
     print("Running face detection...");
-    print("Image Width: $imageWidth, Image Height: $imageHeight");
-    print("Input Image Bytes Length: ${imageBytes.length}");
+    // print("Image Width: $imageWidth, Image Height: $imageHeight");
+    // print("Input Image Bytes Length: ${imageBytes.length}");
     final faceDetector = GoogleMlKit.vision.faceDetector(FaceDetectorOptions(
       enableClassification: true, // Enables "smiling" and "eye open" probability
       enableLandmarks: true, // Enables landmark detection (e.g., eyes, nose, mouth)
@@ -373,12 +373,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     print("Faces detected: ${faces.length}");
 
     if (faces.isNotEmpty) {
-      for (var face in faces) {
-        print("Face bounding box: ${face.boundingBox}");
-        print("Smiling probability: ${face.smilingProbability}");
-        print("Left eye open probability: ${face.leftEyeOpenProbability}");
-        print("Right eye open probability: ${face.rightEyeOpenProbability}");
-      }
       return faces.first.boundingBox;
     } else {
       print("No face detected.");
