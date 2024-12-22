@@ -77,6 +77,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool _isProcessingFrame = false; // Prevent overlapping frame processing
   bool isDetecting = false; // Flag to control detection
   Rect? boundingBox; // Bounding box for the detected face
+  bool showBoundingBox = false; // Default to showing the bounding box
   int imageWidth = 224; // Default width of the image (update dynamically if needed)
   int imageHeight = 224; // Default height of the image (update dynamically if needed)
 
@@ -85,24 +86,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   void initState() {
     super.initState();
     initializeCamera();
-
-    // Find the front camera from the list of available cameras
-    // CameraDescription? frontCamera;
-    // for (var camera in cameras) {
-    //   if (camera.lensDirection == CameraLensDirection.front) {
-    //     frontCamera = camera;
-    //     break;
-    //   }
-    // }
-    //
-    // // Initialize the controller with the front camera
-    // if (frontCamera != null) {
-    //   _controller = CameraController(frontCamera, ResolutionPreset.medium, enableAudio: false);
-    //   _initializeControllerFuture = _controller.initialize();
-    // } else {
-    //   // Handle case where no front camera is found
-    //   print('Front camera not available');
-    // }
   }
 
   // Initialize the front camera
@@ -122,23 +105,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     await _cameraController!.initialize();
     setState(() {});
   }
-
-  // Future<void> initializeCamera() async {
-  //   final cameras = await availableCameras();
-  //   // Select the front camera
-  //   final frontCamera = cameras.firstWhere(
-  //         (camera) => camera.lensDirection == CameraLensDirection.front,
-  //     orElse: () => throw Exception("No front camera found!"),
-  //   );
-  //   _cameraController = CameraController(
-  //       frontCamera,
-  //       ResolutionPreset.medium,
-  //       enableAudio: false
-  //   );
-  //   await _cameraController?.initialize();
-  //   _isInitialized = true; // Set flag to true after initialization
-  //   _cameraController!.startImageStream(processCameraFrame);
-  // }
 
   // Start detection (runs every 3 seconds)
   void startDetection() {
@@ -468,7 +434,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
             children: [
         if (_cameraController != null && _cameraController!.value.isInitialized)
           CameraPreview(_cameraController!),
-        if (boundingBox != null)
+        if (showBoundingBox && boundingBox != null)
           Positioned.fill( // Ensures CustomPaint fills the available space
             child: CustomPaint(
               painter: FaceBoundingBoxPainter(
@@ -510,14 +476,15 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                 ),
               ),
             ),
-          Expanded(
-            child: Center(
-              child: Text(
-                "Detection Result: $detectionResult",
-                style: TextStyle(fontSize: 24),
-              ),
-            ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                showBoundingBox = !showBoundingBox; // Toggle visibility
+              });
+            },
+            child: Text(showBoundingBox ? "Hide Bounding Box" : "Show Bounding Box"),
           ),
+          SizedBox(height: 10),
           // ElevatedButton(
           //   onPressed: () async {
           //     try {
