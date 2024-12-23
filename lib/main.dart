@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'bounding_box.dart';
-import 'mediapipe_channel.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 
 final TFLiteService _tfliteService = TFLiteService();
 // final CameraService _cameraService = CameraService();
@@ -74,12 +74,17 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   String faceDetectionResult = 'No Result';
   Timer? _detectionTimer;
   DateTime? _lastDetectionTime; // Track the last detection time
+  DateTime? _lastFaceDetectionTime; // Track the last detection time
   bool _isProcessingFrame = false; // Prevent overlapping frame processing
+  bool _isProcessingFace = false; // Prevent overlapping frame processing
   bool isDetecting = false; // Flag to control detection
   Rect? boundingBox; // Bounding box for the detected face
   bool showBoundingBox = false; // Default to showing the bounding box
   int imageWidth = 224; // Default width of the image (update dynamically if needed)
   int imageHeight = 224; // Default height of the image (update dynamically if needed)
+  final AudioPlayer audioPlayer = AudioPlayer(); // Initialize audio player
+  int drowsyCount = 0; // Counter for consecutive drowsy detections
+
 
 
   @override
@@ -132,7 +137,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         processCameraFrame(image);
 
         // Run inference
-        String result = detectDrowsiness(inputBytes);
+        String result = await detectDrowsiness(inputBytes);
 
         // Update UI
         setState(() {
@@ -156,22 +161,22 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     // Stop the image stream
     _cameraController!.stopImageStream();
-    print("Detection Stopped!");
+    // print("Detection Stopped!");
   }
 
   // Process frames from the camera
   void processCameraFrame(CameraImage image) async {
-    print("Processing camera frame...");
+    // print("Processing camera frame...");
     final now = DateTime.now();
 
-    if (_lastDetectionTime != null && DateTime.now().difference(_lastDetectionTime!) < Duration(milliseconds: 3000)) {
-      print("Skipping frame: too soon after last detection.");
+    if (_lastFaceDetectionTime != null && DateTime.now().difference(_lastFaceDetectionTime!) < Duration(milliseconds: 500)) {
+      // print("Skipping frame: too soon after last detection.");
       return;
     }
 
     try {
-      _isProcessingFrame = true;
-      _lastDetectionTime = now;
+      _isProcessingFace = true;
+      _lastFaceDetectionTime = now;
 
       // Update image dimensions dynamically
       setState(() {
@@ -190,66 +195,84 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           boundingBox = detectedBox;
           faceDetectionResult = "Face Detected";
         });
-        print("Bounding Box Detected: $boundingBox");
+        // print("Bounding Box Detected: $boundingBox");
       } else {
         setState(() {
           faceDetectionResult = "No Face Detected";
         });
-        print("No face detected.");
+        // print("No face detected.");
       }
     } catch (e) {
       print("Error processing frame: $e");
     } finally {
-      _isProcessingFrame = false;
+      _isProcessingFace = false;
     }
   }
 
 
 
+  // Run TensorFlow Lite inference
+  String olddetectDrowsiness(Uint8List inputBytes) {
+    // final now = DateTime.now();
+    //
+    // if (_lastDetectionTime != null) {
+    //   final timeInterval = now.difference(_lastDetectionTime!).inMilliseconds / 5000.0;
+    //   print("Time interval since last detection: ${timeInterval.toStringAsFixed(2)} seconds");
+    //
+    //   if (timeInterval < 1.0) {
+    //     print("Skipping detection: Too soon since last detection.");
+    //     return "Skipping";
+    //   }
+    // }
+    //
+    // _lastDetectionTime = now;
 
+    final result = _tfliteService.runModel(inputBytes);
+    double value = result[0];
+    return value > 0.5 ? "Drowsy" : "Alert";
+  }
 
-
-
-
-  void oldProcessCameraFrame(CameraImage image) async {
-    final now = DateTime.now();
-
-    if (_lastDetectionTime != null && now.difference(_lastDetectionTime!) < Duration(seconds: 3)) {
-      return;
-    }
-    if (_isProcessingFrame) return;
-
+  Future<String> detectDrowsiness(Uint8List inputBytes) async {
     try {
-      _isProcessingFrame = true;
-      _lastDetectionTime = now;
+      // Limit detections to every 1 seconds
+      final now = DateTime.now();
+      if (_lastDetectionTime != null) {
+        final timeInterval = now.difference(_lastDetectionTime!).inMilliseconds / 1000.0;
 
-      // Update image dimensions dynamically
-      setState(() {
-        imageWidth = image.width;
-        imageHeight = image.height;
-      });
+        if (timeInterval < 1.0) { // Check against the correct interval
+          // print("Skipping detection: Too soon since last detection.");
+          return detectionResult;
+        }
+      }
 
-      // Use MediaPipe for face detection
-      Uint8List bgraBytes = image.planes[0].bytes;
-      Rect? detectedBox = await detectFace(bgraBytes);
 
-      if (detectedBox != null) {
-        setState(() {
-          boundingBox = detectedBox;
-          faceDetectionResult = "Face Detected";
-        });
-        print("Bounding Box Detected: $boundingBox");
+      _lastDetectionTime = now; // Update the last detection time
+
+      final result = _tfliteService.runModel(inputBytes); // Ensure result matches the updated runModel
+      if (result[0] == "Error") {
+        print("Error running model");
+        return " ";
+      }
+      double value = result[0];
+
+      // Add threshold logic for binary classification
+      if (value >= 0.5) {
+        drowsyCount++;
+        print("Drowsy count: $drowsyCount");
+
+        if (drowsyCount >= 4) {
+          // Play sound alert after 4 consecutive drowsy detections
+          await audioPlayer.play(AssetSource('sounds/warning.mp3'));
+          drowsyCount = 0; // Reset counter after alert
+        }
+        return "Drowsy"; // Class 1
       } else {
-        setState(() {
-          boundingBox = null;
-          faceDetectionResult = "No Face Detected";
-        });
-        print("No face detected.");
+        drowsyCount = 0; // Reset counter if not drowsy
+        return "Alert"; // Class 0
       }
     } catch (e) {
-      print("Error processing frame: $e");
-    } finally {
-      _isProcessingFrame = false;
+      print("Error detecting drowsiness: $e");
+      return "Error";
     }
   }
 
@@ -301,13 +324,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     });
   }
 
-  // Run TensorFlow Lite inference
-  String detectDrowsiness(Uint8List inputBytes) {
-    final result = _tfliteService.runModel(inputBytes);
-    double value = result[0];
-    return value > 0.5 ? "Drowsy" : "Alert";
-  }
-
 
 
   Future<Rect?> detectFace(Uint8List imageBytes) async {
@@ -347,40 +363,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
 
-
-
-  Future<Rect?> oldDetectFace(Uint8List imageBytes) async {
-    print("Running face detection...");
-    final faceDetector = GoogleMlKit.vision.faceDetector();
-    final inputImage = InputImage.fromBytes(
-      bytes: imageBytes,
-      inputImageData: InputImageData(
-        size: Size(224, 224), // Replace with actual image size
-        inputImageFormat: InputImageFormat.BGRA8888, // Specify image format
-        planeData: [
-          InputImagePlaneMetadata(
-            bytesPerRow: 224 * 4, // 4 bytes per pixel for BGRA8888
-            height: 224,
-            width: 224,
-          )
-        ],
-        imageRotation: InputImageRotation.Rotation_0deg, // Corrected enum constant
-      ),
-    );
-
-    final faces = await faceDetector.processImage(inputImage);
-
-    print("Faces detected: ${faces.length}");
-
-    if (faces.isNotEmpty) {
-      final face = faces.first;
-      faceDetector.close();
-      return face.boundingBox; // Return the bounding box of the detected face
-    }
-
-    faceDetector.close();
-    return null; // No face detected
-  }
 
   // Function to crop the detected face and preprocess it for TensorFlow Lite
   Uint8List cropAndPreprocessFace(

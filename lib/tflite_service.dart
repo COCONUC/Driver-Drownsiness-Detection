@@ -1,8 +1,8 @@
 import 'dart:typed_data';
-import 'dart:ui';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
+
 
 
 class TFLiteService {
@@ -13,7 +13,7 @@ class TFLiteService {
     // var gpuDelegate = GpuDelegateV2();
     // var options = InterpreterOptions()..addDelegate(gpuDelegate);
     try {
-      _interpreter = await Interpreter.fromAsset('models/sigmoid_drowsiness_detection_model.tflite');
+      _interpreter = await Interpreter.fromAsset('models/drowsiness_detection_model.tflite');
       print("Model loaded successfully!");
     } catch (e) {
       print("Error loading model: $e");
@@ -25,6 +25,8 @@ class TFLiteService {
     var output = List.filled(1, 0.0).reshape([1, 1]); // Match model output shape
     try {
       _interpreter.run(input, output);
+      print("Model output: $output");
+      print("Prediction value: ${output[0][0]}");
       return output[0]; // Return result
     } catch (e) {
       print("Error running model: $e");
