@@ -2,6 +2,7 @@ import 'package:driver_drownsiness_detection/tflite_service.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 import 'bounding_box.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
@@ -134,17 +135,25 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           image.height,
         );
 
-        processCameraFrame(image);
+        // processCameraFrame(image);
 
-        // Run inference
-        String result = await detectDrowsiness(inputBytes);
+        final face =  await detectFaceAndCrop(image.planes[0].bytes);
 
-        // Update UI
-        setState(() {
-          detectionResult = result;
-        });
+        if(face != null) {
+          print("Running drowsiness model...");
+          final preprocessedFace = preprocessFace(face);
+          print("Face image size: ${preprocessedFace.length}");
+          // Run inference
+          String result = await detectDrowsiness(preprocessedFace);
 
-        print("Detection Result: $result");
+          // Update UI
+          setState(() {
+            detectionResult = result;
+          });
+          print("Detection Result: $result");
+        } else {
+          print("No face found in the image.");
+        }
       } catch (e) {
         print("Error during detection: $e");
       } finally {
@@ -189,6 +198,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       // Use MediaPipe for face detection
       Uint8List bgraBytes = image.planes[0].bytes;
       Rect? detectedBox = await detectFace(bgraBytes);
+      // Uint8List? detectedBox = await detectFaceAndCrop(bgraBytes);
 
       if (detectedBox != null) {
         setState(() {
@@ -209,28 +219,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     }
   }
 
-
-
-  // Run TensorFlow Lite inference
-  String olddetectDrowsiness(Uint8List inputBytes) {
-    // final now = DateTime.now();
-    //
-    // if (_lastDetectionTime != null) {
-    //   final timeInterval = now.difference(_lastDetectionTime!).inMilliseconds / 5000.0;
-    //   print("Time interval since last detection: ${timeInterval.toStringAsFixed(2)} seconds");
-    //
-    //   if (timeInterval < 1.0) {
-    //     print("Skipping detection: Too soon since last detection.");
-    //     return "Skipping";
-    //   }
-    // }
-    //
-    // _lastDetectionTime = now;
-
-    final result = _tfliteService.runModel(inputBytes);
-    double value = result[0];
-    return value > 0.5 ? "Drowsy" : "Alert";
-  }
 
   Future<String> detectDrowsiness(Uint8List inputBytes) async {
     try {
@@ -277,6 +265,26 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
 
+  Uint8List convertBGRAtoJPG(Uint8List bgraBytes, int width, int height) {
+    // Create an empty RGB image
+    final img.Image rgbImage = img.Image(width, height);
+
+    int index = 0;
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        // BGRA8888 to RGB888
+        int b = bgraBytes[index];
+        int g = bgraBytes[index + 1];
+        int r = bgraBytes[index + 2];
+        // Ignore alpha channel
+        rgbImage.setPixel(x, y, img.getColor(r, g, b));
+        index += 4; // Move to the next pixel
+      }
+    }
+
+    // Encode the RGB image as JPG
+    return Uint8List.fromList(img.encodeJpg(rgbImage));
+  }
 
 
 
@@ -305,7 +313,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     }
 
     // Debug log: Print first 10 normalized values
-    print("Preprocessed input data (first 10 values): ${floatList.take(10).toList()}");
+    // print("Preprocessed input data (first 10 values): ${floatList.take(10).toList()}");
 
     // Convert List<double> to Float32List for input tensor
     return Float32List.fromList(floatList).buffer.asUint8List();
@@ -330,7 +338,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
 
   Future<Rect?> detectFace(Uint8List imageBytes) async {
-    print("Running face detection...");
+    // print("Running face detection...");
     // print("Image Width: $imageWidth, Image Height: $imageHeight");
     // print("Input Image Bytes Length: ${imageBytes.length}");
     final faceDetector = GoogleMlKit.vision.faceDetector(FaceDetectorOptions(
@@ -355,14 +363,119 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     );
 
     final faces = await faceDetector.processImage(inputImage);
-    print("Faces detected: ${faces.length}");
+    // print("Faces detected: ${faces.length}");
 
     if (faces.isNotEmpty) {
       return faces.first.boundingBox;
     } else {
-      print("No face detected.");
+      // print("No face detected.");
     }
     return null;
+  }
+
+
+  Future<Uint8List?> detectFaceAndCrop(Uint8List imageBytes) async {
+    print("Running face detection...");
+    print("Input image size: ${imageBytes.length} bytes");
+
+    final faceDetector = GoogleMlKit.vision.faceDetector(FaceDetectorOptions(
+      enableClassification: true,
+      enableLandmarks: true,
+      enableTracking: true,
+    ));
+
+    // Detect faces
+    final inputImage = InputImage.fromBytes(
+      bytes: imageBytes,
+      inputImageData: InputImageData(
+        size: Size(480, 640),
+        imageRotation: InputImageRotation.Rotation_0deg,
+        inputImageFormat: InputImageFormat.BGRA8888,
+        planeData: [
+          InputImagePlaneMetadata(
+            bytesPerRow: 1920,
+            height: 640,
+            width: 480,
+          )
+        ],
+      ),
+    );
+
+    final faces = await faceDetector.processImage(inputImage);
+    print("Faces detected: ${faces.length}");
+
+    if (faces.isNotEmpty) {
+      try {
+        final boundingBox = faces.first.boundingBox;
+        print("Detected bounding box: $boundingBox");
+
+        // Convert BGRA8888 to JPG
+        final convertedImage = convertBGRAtoJPG(imageBytes, 480, 640);
+
+        // Crop the face region
+        final croppedFace = cropFace(convertedImage, boundingBox);
+        print("Cropped face size: ${croppedFace.length} bytes");
+
+        return croppedFace;
+      } catch (e) {
+        print("Error cropping face: $e");
+      }
+    } else {
+      print("No face detected.");
+    }
+
+    return null;
+  }
+
+
+
+  Uint8List cropFace(Uint8List originalImageBytes, Rect boundingBox) {
+    print("Original image size: ${originalImageBytes.length} bytes");
+
+    // Decode the original image
+    final decodedImage = img.decodeImage(originalImageBytes);
+    if (decodedImage == null) {
+      print("Decoded image is null. Check the input image bytes.");
+      throw Exception("Failed to decode image.");
+    }
+
+    print("Decoded image dimensions: ${decodedImage.width}x${decodedImage.height}");
+
+    // Calculate and clamp bounding box to image dimensions
+    final int x = boundingBox.left.toInt().clamp(0, decodedImage.width - 1);
+    final int y = boundingBox.top.toInt().clamp(0, decodedImage.height - 1);
+    final int width = boundingBox.width.toInt().clamp(0, decodedImage.width - x);
+    final int height = boundingBox.height.toInt().clamp(0, decodedImage.height - y);
+
+    print("Clamped bounding box: x=$x, y=$y, width=$width, height=$height");
+
+    // Crop the face region
+    final croppedFace = img.copyCrop(decodedImage, x, y, width, height);
+
+    print("Cropped face dimensions: ${croppedFace.width}x${croppedFace.height}");
+
+    // Encode cropped face back to bytes
+    return Uint8List.fromList(img.encodeJpg(croppedFace));
+  }
+
+  Uint8List preprocessFace(Uint8List faceBytes) {
+    final decodedImage = img.decodeImage(faceBytes);
+    if (decodedImage == null) throw Exception("Failed to decode face image.");
+
+    // Resize to match model input dimensions (e.g., 224x224)
+    final resizedImage = img.copyResize(decodedImage, width: 224, height: 224);
+
+    // Normalize pixel values to [0, 1]
+    List<double> normalizedPixels = [];
+    for (var pixel in resizedImage.data) {
+      normalizedPixels.add(img.getRed(pixel) / 255.0);
+      normalizedPixels.add(img.getGreen(pixel) / 255.0);
+      normalizedPixels.add(img.getBlue(pixel) / 255.0);
+    }
+
+    //print("Preprocessed face data (first 10 values): ${normalizedPixels.take(10).toList()}");
+
+    return Float32List.fromList(normalizedPixels).buffer.asUint8List();
   }
 
 

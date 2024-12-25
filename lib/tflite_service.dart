@@ -13,7 +13,7 @@ class TFLiteService {
     // var gpuDelegate = GpuDelegateV2();
     // var options = InterpreterOptions()..addDelegate(gpuDelegate);
     try {
-      _interpreter = await Interpreter.fromAsset('models/drowsiness_detection_model.tflite');
+      _interpreter = await Interpreter.fromAsset('models/sigmoid_drowsiness_detection_model.tflite');
       print("Model loaded successfully!");
     } catch (e) {
       print("Error loading model: $e");
@@ -56,25 +56,6 @@ class TFLiteService {
     _interpreter.close();
   }
 
-
-  TensorImage preprocessImage(Uint8List imageData) {
-    // Decode image using the 'image' package
-    img.Image? decodedImage = img.decodeImage(imageData);
-    if (decodedImage == null) {
-      throw Exception("Failed to decode image.");
-    }
-
-    // Convert decoded image to TensorImage
-    TensorImage tensorImage = TensorImage.fromImage(decodedImage);
-
-    // Create an ImageProcessor with resize and normalization steps
-    var imageProcessor = ImageProcessorBuilder()
-        .add(ResizeOp(224, 224, ResizeMethod.BILINEAR)) // Resize to model input size
-        .add(NormalizeOp(0, 255)) // Normalize pixel values to [0, 1]
-        .build();
-
-    return imageProcessor.process(tensorImage);
-  }
 
   String interpretOutput(List<dynamic> output) {
     double value = output[0][0];
