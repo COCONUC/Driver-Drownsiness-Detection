@@ -304,6 +304,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       }
     }
 
+    // Debug log: Print first 10 normalized values
+    print("Preprocessed input data (first 10 values): ${floatList.take(10).toList()}");
+
     // Convert List<double> to Float32List for input tensor
     return Float32List.fromList(floatList).buffer.asUint8List();
   }
