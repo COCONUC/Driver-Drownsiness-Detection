@@ -81,8 +81,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool isDetecting = false; // Flag to control detection
   Rect? boundingBox; // Bounding box for the detected face
   bool showBoundingBox = false; // Default to showing the bounding box
-  int imageWidth = 224; // Default width of the image (update dynamically if needed)
-  int imageHeight = 224; // Default height of the image (update dynamically if needed)
+  int imageWidth = 480; // Default width of the image (update dynamically if needed)
+  int imageHeight = 640; // Default height of the image (update dynamically if needed)
   final AudioPlayer audioPlayer = AudioPlayer(); // Initialize audio player
   int drowsyCount = 0; // Counter for consecutive drowsy detections
 
@@ -129,20 +129,26 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         _isProcessingFrame = true;
 
         // Preprocess BGRA8888 image
-        Uint8List inputBytes = preprocessBGRAImage(
-          image.planes[0].bytes,
-          image.width,
-          image.height,
-        );
+        // Uint8List inputBytes = preprocessBGRAImage(
+        //   image.planes[0].bytes,
+        //   image.width,
+        //   image.height,
+        // );
 
         // processCameraFrame(image);
 
         final face =  await detectFaceAndCrop(image.planes[0].bytes);
 
         if(face != null) {
-          print("Running drowsiness model...");
-          final preprocessedFace = preprocessFace(face);
+          // print("Running drowsiness model...");
+          final Rect detectBoundingBox = face['boundingBox'];
+          final Uint8List preprocessedFace = preprocessFace(face['croppedFace']);
           print("Face image size: ${preprocessedFace.length}");
+
+          setState(() {
+            boundingBox = detectBoundingBox;
+            faceDetectionResult = "Face Detected";
+          });
           // Run inference
           String result = await detectDrowsiness(preprocessedFace);
 
@@ -152,6 +158,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           });
           print("Detection Result: $result");
         } else {
+          setState(() {
+            boundingBox = null;
+            faceDetectionResult = "No Face Detected";
+          });
           print("No face found in the image.");
         }
       } catch (e) {
@@ -197,12 +207,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
       // Use MediaPipe for face detection
       Uint8List bgraBytes = image.planes[0].bytes;
-      Rect? detectedBox = await detectFace(bgraBytes);
-      // Uint8List? detectedBox = await detectFaceAndCrop(bgraBytes);
+      final detectedBox = await detectFaceAndCrop(bgraBytes);
 
       if (detectedBox != null) {
+        final Rect detectedFaceBox = detectedBox['boundingBox'];
         setState(() {
-          boundingBox = detectedBox;
+          boundingBox = detectedFaceBox;
           faceDetectionResult = "Face Detected";
         });
         // print("Bounding Box Detected: $boundingBox");
@@ -374,7 +384,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
 
-  Future<Uint8List?> detectFaceAndCrop(Uint8List imageBytes) async {
+  Future<Map<String, dynamic>?> detectFaceAndCrop(Uint8List imageBytes) async {
     print("Running face detection...");
     print("Input image size: ${imageBytes.length} bytes");
 
@@ -416,7 +426,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         final croppedFace = cropFace(convertedImage, boundingBox);
         print("Cropped face size: ${croppedFace.length} bytes");
 
-        return croppedFace;
+        return {
+          'croppedFace': croppedFace,
+          'boundingBox': boundingBox,
+        };
       } catch (e) {
         print("Error cropping face: $e");
       }
