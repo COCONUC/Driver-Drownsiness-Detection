@@ -147,14 +147,17 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           final Uint8List preprocessedFace = preprocessFace(face['croppedFace']);
           final leftEye = face['leftEye'];
           final rightEye = face['rightEye'];
+          final isLeftEyeClosed = face['isLeftEyeClosed'];
+          final isRightEyeClosed = face['isRightEyeClosed'];
           // print("Face image size: ${preprocessedFace.length}");
 
           setState(() {
             boundingBox = detectBoundingBox;
             faceDetectionResult = "Face Detected";
           });
+
           // Run inference
-          String result = await detectDrowsiness(preprocessedFace);
+          String modelResult = await detectDrowsiness(preprocessedFace);
 
           if (leftEye != null && rightEye != null) {
             setState(() {
@@ -162,14 +165,44 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               rightEyePosition = rightEye;
             });
           } else {
+            setState(() {
+              leftEyePosition = null;
+              rightEyePosition = null;
+            });
             print("Eye landmarks not detected.");
           }
 
-          // Update UI
-          setState(() {
-            detectionResult = result;
-          });
-          print("Detection Result: $result");
+
+          if (modelResult == "Drowsy"){
+            // Update UI
+            setState(() {
+              detectionResult = modelResult;
+            });
+            print("Model Result: $modelResult");
+          } else {
+            if (leftEye != null && rightEye != null) {
+              // Final Classification Logic
+              if (isLeftEyeClosed && isRightEyeClosed) {
+                print("Drowsy");
+                setState(() {
+                  detectionResult = "Drowsy";
+                });
+              } else if (isLeftEyeClosed || isRightEyeClosed) {
+                print("Alert (one eye closed)");
+                setState(() {
+                  detectionResult = "Alert";
+                });
+              } else {
+                print("Alert (both eyes open)");
+                setState(() {
+                  detectionResult = "Alert";
+                });
+              }
+            } else {
+              print("No detection result after 2 logics");
+            }
+          }
+
         } else {
           setState(() {
             boundingBox = null;
@@ -298,6 +331,19 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     final ear = (verticalDistance1 + verticalDistance2) / (2.0 * horizontalDistance);
     return ear;
+  }
+
+  void checkEyeState(Map<String, dynamic> eyeState) {
+    final isLeftEyeClosed = eyeState['leftEyeClosed'] as bool;
+    final isRightEyeClosed = eyeState['rightEyeClosed'] as bool;
+
+    if (isLeftEyeClosed && isRightEyeClosed) {
+      print("Drowsy");
+    } else if (isLeftEyeClosed || isRightEyeClosed) {
+      print("Alert (one eye closed)");
+    } else {
+      print("Alert (both eyes open)");
+    }
   }
 
 
@@ -459,11 +505,25 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         final croppedFace = cropFace(convertedImage, boundingBox);
         // print("Cropped face size: ${croppedFace.length} bytes");
 
+
+        // Eye open probabilities
+        final double? leftEyeOpenProbability = face.leftEyeOpenProbability;
+        final double? rightEyeOpenProbability = face.rightEyeOpenProbability;
+
+        print("Left Eye Open Probability: $leftEyeOpenProbability");
+        print("Right Eye Open Probability: $rightEyeOpenProbability");
+
+        // Determine eye states
+        final isLeftEyeClosed = leftEyeOpenProbability != null && leftEyeOpenProbability < 0.5;
+        final isRightEyeClosed = rightEyeOpenProbability != null && rightEyeOpenProbability < 0.5;
+
         return {
           'croppedFace': croppedFace,
           'boundingBox': boundingBox,
           'leftEye': leftEye,
-          'rightEye': rightEye
+          'rightEye': rightEye,
+          'isLeftEyeClosed': isLeftEyeClosed,
+          'isRightEyeClosed': isRightEyeClosed
         };
 
       } catch (e) {
