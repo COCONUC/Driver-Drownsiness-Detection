@@ -81,6 +81,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool isDetecting = false; // Flag to control detection
   Rect? boundingBox; // Bounding box for the detected face
   bool showBoundingBox = false; // Default to showing the bounding box
+  Offset? leftEyePosition;   // Detected left eye position
+  Offset? rightEyePosition;  // Detected right eye position
   int imageWidth = 480; // Default width of the image (update dynamically if needed)
   int imageHeight = 640; // Default height of the image (update dynamically if needed)
   final AudioPlayer audioPlayer = AudioPlayer(); // Initialize audio player
@@ -143,7 +145,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           // print("Running drowsiness model...");
           final Rect detectBoundingBox = face['boundingBox'];
           final Uint8List preprocessedFace = preprocessFace(face['croppedFace']);
-          print("Face image size: ${preprocessedFace.length}");
+          // print("Face image size: ${preprocessedFace.length}");
 
           setState(() {
             boundingBox = detectBoundingBox;
@@ -416,29 +418,72 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     if (faces.isNotEmpty) {
       try {
-        final boundingBox = faces.first.boundingBox;
-        print("Detected bounding box: $boundingBox");
+
+        final face = faces.first;
+
+        final boundingBox = face.boundingBox;
+        // print("Detected bounding box: $boundingBox");
+
+        // Get eye landmarks
+        final leftEye = face.getLandmark(FaceLandmarkType.leftEye)?.position;
+        final rightEye = face.getLandmark(FaceLandmarkType.rightEye)?.position;
+        if (leftEye != null && rightEye != null) {
+          setState(() {
+            leftEyePosition = leftEye;
+            rightEyePosition = rightEye;
+          });
+        } else {
+          print("Eye landmarks not detected.");
+        }
 
         // Convert BGRA8888 to JPG
         final convertedImage = convertBGRAtoJPG(imageBytes, 480, 640);
 
         // Crop the face region
         final croppedFace = cropFace(convertedImage, boundingBox);
-        print("Cropped face size: ${croppedFace.length} bytes");
+        // print("Cropped face size: ${croppedFace.length} bytes");
 
         return {
           'croppedFace': croppedFace,
           'boundingBox': boundingBox,
         };
+
       } catch (e) {
         print("Error cropping face: $e");
       }
+
     } else {
       print("No face detected.");
     }
 
     return null;
   }
+
+
+  Uint8List cropEye(Uint8List imageBytes, Offset eyePosition, Rect faceBoundingBox, int targetWidth, int targetHeight) {
+    final decodedImage = img.decodeImage(imageBytes);
+    if (decodedImage == null) throw Exception("Failed to decode image.");
+
+    // Calculate eye region bounds
+    final int eyeX = (faceBoundingBox.left + eyePosition.dx).toInt();
+    final int eyeY = (faceBoundingBox.top + eyePosition.dy).toInt();
+    final int eyeWidth = (faceBoundingBox.width * 0.2).toInt();
+    final int eyeHeight = (faceBoundingBox.height * 0.1).toInt();
+
+    // Clamp to ensure eye region stays within image bounds
+    final croppedEye = img.copyCrop(
+      decodedImage,
+      eyeX.clamp(0, decodedImage.width - 1),
+      eyeY.clamp(0, decodedImage.height - 1),
+      eyeWidth.clamp(0, decodedImage.width - eyeX),
+      eyeHeight.clamp(0, decodedImage.height - eyeY),
+    );
+
+    // Resize and normalize
+    final resizedEye = img.copyResize(croppedEye, width: targetWidth, height: targetHeight);
+    return Uint8List.fromList(img.encodeJpg(resizedEye));
+  }
+
 
 
 
@@ -452,7 +497,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       throw Exception("Failed to decode image.");
     }
 
-    print("Decoded image dimensions: ${decodedImage.width}x${decodedImage.height}");
+    //print("Decoded image dimensions: ${decodedImage.width}x${decodedImage.height}");
 
     // Calculate and clamp bounding box to image dimensions
     final int x = boundingBox.left.toInt().clamp(0, decodedImage.width - 1);
@@ -460,12 +505,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     final int width = boundingBox.width.toInt().clamp(0, decodedImage.width - x);
     final int height = boundingBox.height.toInt().clamp(0, decodedImage.height - y);
 
-    print("Clamped bounding box: x=$x, y=$y, width=$width, height=$height");
+    //print("Clamped bounding box: x=$x, y=$y, width=$width, height=$height");
 
     // Crop the face region
     final croppedFace = img.copyCrop(decodedImage, x, y, width, height);
 
-    print("Cropped face dimensions: ${croppedFace.width}x${croppedFace.height}");
+    //print("Cropped face dimensions: ${croppedFace.width}x${croppedFace.height}");
 
     // Encode cropped face back to bytes
     return Uint8List.fromList(img.encodeJpg(croppedFace));
@@ -487,6 +532,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     }
 
     //print("Preprocessed face data (first 10 values): ${normalizedPixels.take(10).toList()}");
+    //print("Input face dimensions: ${resizedImage.width}x${resizedImage.height}");
 
     return Float32List.fromList(normalizedPixels).buffer.asUint8List();
   }
@@ -550,6 +596,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
             child: CustomPaint(
               painter: FaceBoundingBoxPainter(
                 boundingBox: boundingBox!,
+                leftEye: leftEyePosition,
+                rightEye: rightEyePosition,
                 imageSize: Size(imageWidth.toDouble(), imageHeight.toDouble()),
               ),
             ),

@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 class FaceBoundingBoxPainter extends CustomPainter {
   final Rect boundingBox;
   final Size imageSize;
+  final Offset? leftEye;
+  final Offset? rightEye;
 
   FaceBoundingBoxPainter({
     required this.boundingBox,
     required this.imageSize,
+    this.leftEye,
+    this.rightEye,
   });
 
   @override
@@ -48,6 +52,42 @@ class FaceBoundingBoxPainter extends CustomPainter {
 
     // Draw the scaled bounding box
     canvas.drawRect(scaledRect, paint);
+
+
+    // Draw the left eye bounding box (optional: add size around the eye landmark)
+    if (leftEye != null) {
+      final Offset scaledLeftEye = Offset(leftEye!.dx * scaleX, leftEye!.dy * scaleY);
+      final Rect leftEyeBox = Rect.fromCenter(
+        center: scaledLeftEye,
+        width: 40.0, // Width of the eye box
+        height: 20.0, // Height of the eye box
+      );
+
+      final Paint eyePaint = Paint()
+        ..color = Colors.blue
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawRect(leftEyeBox, eyePaint);
+    }
+
+    // Draw the right eye bounding box
+    if (rightEye != null) {
+      final Offset scaledRightEye = Offset(rightEye!.dx * scaleX, rightEye!.dy * scaleY);
+      final Rect rightEyeBox = Rect.fromCenter(
+        center: scaledRightEye,
+        width: 40.0, // Width of the eye box
+        height: 20.0, // Height of the eye box
+      );
+
+      final Paint eyePaint = Paint()
+        ..color = Colors.blue
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawRect(rightEyeBox, eyePaint);
+    }
+
   }
 
   @override
