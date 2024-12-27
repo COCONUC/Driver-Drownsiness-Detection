@@ -387,8 +387,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
 
   Future<Map<String, dynamic>?> detectFaceAndCrop(Uint8List imageBytes) async {
-    print("Running face detection...");
-    print("Input image size: ${imageBytes.length} bytes");
+    //print("Running face detection...");
+    //print("Input image size: ${imageBytes.length} bytes");
 
     final faceDetector = GoogleMlKit.vision.faceDetector(FaceDetectorOptions(
       enableClassification: true,
