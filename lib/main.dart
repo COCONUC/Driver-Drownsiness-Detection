@@ -87,6 +87,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   int imageHeight = 640; // Default height of the image (update dynamically if needed)
   final AudioPlayer audioPlayer = AudioPlayer(); // Initialize audio player
   int drowsyCount = 0; // Counter for consecutive drowsy detections
+  int eyeDrowsyCount = 0; // Counter for consecutive eye closed detections
 
 
 
@@ -183,17 +184,26 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
             if (leftEye != null && rightEye != null) {
               // Final Classification Logic
               if (isLeftEyeClosed && isRightEyeClosed) {
-                print("Drowsy");
-                setState(() {
-                  detectionResult = "Drowsy";
-                });
+                eyeDrowsyCount++;
+                print("Eye closed count: $eyeDrowsyCount");
+                if (eyeDrowsyCount >= 30) {
+                  // Play sound alert after consecutive eyes closed detections
+                  await audioPlayer.play(AssetSource('sounds/warning.mp3'));
+                  print("Drowsy");
+                  setState(() {
+                    detectionResult = "Drowsy";
+                  });
+                  eyeDrowsyCount = 0; // Reset counter after alert
+                }
               } else if (isLeftEyeClosed || isRightEyeClosed) {
                 print("Alert (one eye closed)");
+                eyeDrowsyCount = 0;
                 setState(() {
                   detectionResult = "Alert";
                 });
               } else {
                 print("Alert (both eyes open)");
+                eyeDrowsyCount = 0;
                 setState(() {
                   detectionResult = "Alert";
                 });
@@ -226,6 +236,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     // Stop the image stream
     _cameraController!.stopImageStream();
+
+    setState(() {
+      showBoundingBox = !showBoundingBox;
+    });
     // print("Detection Stopped!");
   }
 
@@ -304,7 +318,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         drowsyCount++;
         print("Drowsy count: $drowsyCount");
 
-        if (drowsyCount >= 4) {
+        if (drowsyCount >= 3) {
           // Play sound alert after 4 consecutive drowsy detections
           await audioPlayer.play(AssetSource('sounds/warning.mp3'));
           drowsyCount = 0; // Reset counter after alert
@@ -514,8 +528,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         print("Right Eye Open Probability: $rightEyeOpenProbability");
 
         // Determine eye states
-        final isLeftEyeClosed = leftEyeOpenProbability != null && leftEyeOpenProbability < 0.5;
-        final isRightEyeClosed = rightEyeOpenProbability != null && rightEyeOpenProbability < 0.5;
+        final isLeftEyeClosed = leftEyeOpenProbability != null && leftEyeOpenProbability < 0.4;
+        final isRightEyeClosed = rightEyeOpenProbability != null && rightEyeOpenProbability < 0.4;
 
         return {
           'croppedFace': croppedFace,
