@@ -145,6 +145,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           // print("Running drowsiness model...");
           final Rect detectBoundingBox = face['boundingBox'];
           final Uint8List preprocessedFace = preprocessFace(face['croppedFace']);
+          final leftEye = face['leftEye'];
+          final rightEye = face['rightEye'];
           // print("Face image size: ${preprocessedFace.length}");
 
           setState(() {
@@ -153,6 +155,15 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           });
           // Run inference
           String result = await detectDrowsiness(preprocessedFace);
+
+          if (leftEye != null && rightEye != null) {
+            setState(() {
+              leftEyePosition = leftEye;
+              rightEyePosition = rightEye;
+            });
+          } else {
+            print("Eye landmarks not detected.");
+          }
 
           // Update UI
           setState(() {
@@ -274,6 +285,19 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       print("Error detecting drowsiness: $e");
       return "Error";
     }
+  }
+
+
+  double calculateEAR(List<Offset> eyeLandmarks) {
+    // Ensure there are 6 landmarks for the eye
+    if (eyeLandmarks.length < 6) throw Exception("Not enough landmarks for EAR calculation.");
+
+    final horizontalDistance = (eyeLandmarks[0] - eyeLandmarks[3]).distance;
+    final verticalDistance1 = (eyeLandmarks[1] - eyeLandmarks[5]).distance;
+    final verticalDistance2 = (eyeLandmarks[2] - eyeLandmarks[4]).distance;
+
+    final ear = (verticalDistance1 + verticalDistance2) / (2.0 * horizontalDistance);
+    return ear;
   }
 
 
@@ -427,14 +451,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         // Get eye landmarks
         final leftEye = face.getLandmark(FaceLandmarkType.leftEye)?.position;
         final rightEye = face.getLandmark(FaceLandmarkType.rightEye)?.position;
-        if (leftEye != null && rightEye != null) {
-          setState(() {
-            leftEyePosition = leftEye;
-            rightEyePosition = rightEye;
-          });
-        } else {
-          print("Eye landmarks not detected.");
-        }
 
         // Convert BGRA8888 to JPG
         final convertedImage = convertBGRAtoJPG(imageBytes, 480, 640);
@@ -446,6 +462,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         return {
           'croppedFace': croppedFace,
           'boundingBox': boundingBox,
+          'leftEye': leftEye,
+          'rightEye': rightEye
         };
 
       } catch (e) {
