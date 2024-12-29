@@ -239,6 +239,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     setState(() {
       showBoundingBox = !showBoundingBox;
+      detectionResult = "No Result";
     });
     // print("Detection Stopped!");
   }
@@ -292,12 +293,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   Future<String> detectDrowsiness(Uint8List inputBytes) async {
     try {
-      // Limit detections to every 1 seconds
+      // Limit detections to every 0.5 seconds
       final now = DateTime.now();
       if (_lastDetectionTime != null) {
-        final timeInterval = now.difference(_lastDetectionTime!).inMilliseconds / 1000.0;
+        final timeInterval = now.difference(_lastDetectionTime!).inMilliseconds / 500.0;
 
-        if (timeInterval < 1.0) { // Check against the correct interval
+        if (timeInterval < 0.5) { // Check against the correct interval
           // print("Skipping detection: Too soon since last detection.");
           return detectionResult;
         }
@@ -313,13 +314,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       }
       double value = result[0];
 
-      // Add threshold logic for binary classification
-      if (value >= 0.5) {
+      if (value <= 0.5) {
         drowsyCount++;
         print("Drowsy count: $drowsyCount");
 
-        if (drowsyCount >= 3) {
-          // Play sound alert after 4 consecutive drowsy detections
+        if (drowsyCount >= 4) {
+          // Play sound alert after consecutive drowsy detections
           await audioPlayer.play(AssetSource('sounds/warning.mp3'));
           drowsyCount = 0; // Reset counter after alert
         }
@@ -613,7 +613,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     if (decodedImage == null) throw Exception("Failed to decode face image.");
 
     // Resize to match model input dimensions (e.g., 224x224)
-    final resizedImage = img.copyResize(decodedImage, width: 224, height: 224);
+    final resizedImage = img.copyResize(decodedImage, width: 120, height: 120);
 
     // Normalize pixel values to [0, 1]
     List<double> normalizedPixels = [];
