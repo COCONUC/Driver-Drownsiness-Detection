@@ -87,6 +87,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   int imageHeight = 640; // Default height of the image (update dynamically if needed)
   final AudioPlayer audioPlayer = AudioPlayer(); // Initialize audio player
   int drowsyCount = 0; // Counter for consecutive drowsy detections
+  int eyeDrowsyCount = 0; // Counter for consecutive eye closed detections
 
 
 
@@ -145,20 +146,73 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
           // print("Running drowsiness model...");
           final Rect detectBoundingBox = face['boundingBox'];
           final Uint8List preprocessedFace = preprocessFace(face['croppedFace']);
+          final leftEye = face['leftEye'];
+          final rightEye = face['rightEye'];
+          final isLeftEyeClosed = face['isLeftEyeClosed'];
+          final isRightEyeClosed = face['isRightEyeClosed'];
           // print("Face image size: ${preprocessedFace.length}");
 
           setState(() {
             boundingBox = detectBoundingBox;
             faceDetectionResult = "Face Detected";
           });
-          // Run inference
-          String result = await detectDrowsiness(preprocessedFace);
 
-          // Update UI
-          setState(() {
-            detectionResult = result;
-          });
-          print("Detection Result: $result");
+          // Run inference
+          String modelResult = await detectDrowsiness(preprocessedFace);
+
+          if (leftEye != null && rightEye != null) {
+            setState(() {
+              leftEyePosition = leftEye;
+              rightEyePosition = rightEye;
+            });
+          } else {
+            setState(() {
+              leftEyePosition = null;
+              rightEyePosition = null;
+            });
+            print("Eye landmarks not detected.");
+          }
+
+
+          if (modelResult == "Drowsy"){
+            // Update UI
+            setState(() {
+              detectionResult = modelResult;
+            });
+            print("Model Result: $modelResult");
+          } else {
+            if (leftEye != null && rightEye != null) {
+              // Final Classification Logic
+              if (isLeftEyeClosed && isRightEyeClosed) {
+                eyeDrowsyCount++;
+                print("Eye closed count: $eyeDrowsyCount");
+                if (eyeDrowsyCount >= 30) {
+                  // Play sound alert after consecutive eyes closed detections
+                  await audioPlayer.play(AssetSource('sounds/warning.mp3'));
+                  print("Drowsy");
+                  setState(() {
+                    detectionResult = "Drowsy";
+                  });
+                  eyeDrowsyCount = 0; // Reset counter after alert
+                }
+              } else if (isLeftEyeClosed || isRightEyeClosed) {
+                print("Alert (one eye closed)");
+                eyeDrowsyCount = 0;
+                setState(() {
+                  detectionResult = "Alert";
+                });
+              } else {
+                print("Alert (both eyes open)");
+                eyeDrowsyCount = 0;
+                setState(() {
+                  detectionResult = "Alert";
+                });
+              }
+            } else {
+              print("No detection result after 2 logics");
+            }
+          }
+
         } else {
           setState(() {
             boundingBox = null;
@@ -182,6 +236,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     // Stop the image stream
     _cameraController!.stopImageStream();
+
+    setState(() {
+      showBoundingBox = !showBoundingBox;
+    });
     // print("Detection Stopped!");
   }
 
@@ -260,7 +318,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         drowsyCount++;
         print("Drowsy count: $drowsyCount");
 
-        if (drowsyCount >= 4) {
+        if (drowsyCount >= 3) {
           // Play sound alert after 4 consecutive drowsy detections
           await audioPlayer.play(AssetSource('sounds/warning.mp3'));
           drowsyCount = 0; // Reset counter after alert
@@ -273,6 +331,32 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     } catch (e) {
       print("Error detecting drowsiness: $e");
       return "Error";
+    }
+  }
+
+
+  double calculateEAR(List<Offset> eyeLandmarks) {
+    // Ensure there are 6 landmarks for the eye
+    if (eyeLandmarks.length < 6) throw Exception("Not enough landmarks for EAR calculation.");
+
+    final horizontalDistance = (eyeLandmarks[0] - eyeLandmarks[3]).distance;
+    final verticalDistance1 = (eyeLandmarks[1] - eyeLandmarks[5]).distance;
+    final verticalDistance2 = (eyeLandmarks[2] - eyeLandmarks[4]).distance;
+
+    final ear = (verticalDistance1 + verticalDistance2) / (2.0 * horizontalDistance);
+    return ear;
+  }
+
+  void checkEyeState(Map<String, dynamic> eyeState) {
+    final isLeftEyeClosed = eyeState['leftEyeClosed'] as bool;
+    final isRightEyeClosed = eyeState['rightEyeClosed'] as bool;
+
+    if (isLeftEyeClosed && isRightEyeClosed) {
+      print("Drowsy");
+    } else if (isLeftEyeClosed || isRightEyeClosed) {
+      print("Alert (one eye closed)");
+    } else {
+      print("Alert (both eyes open)");
     }
   }
 
@@ -427,14 +511,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         // Get eye landmarks
         final leftEye = face.getLandmark(FaceLandmarkType.leftEye)?.position;
         final rightEye = face.getLandmark(FaceLandmarkType.rightEye)?.position;
-        if (leftEye != null && rightEye != null) {
-          setState(() {
-            leftEyePosition = leftEye;
-            rightEyePosition = rightEye;
-          });
-        } else {
-          print("Eye landmarks not detected.");
-        }
 
         // Convert BGRA8888 to JPG
         final convertedImage = convertBGRAtoJPG(imageBytes, 480, 640);
@@ -443,9 +519,25 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         final croppedFace = cropFace(convertedImage, boundingBox);
         // print("Cropped face size: ${croppedFace.length} bytes");
 
+
+        // Eye open probabilities
+        final double? leftEyeOpenProbability = face.leftEyeOpenProbability;
+        final double? rightEyeOpenProbability = face.rightEyeOpenProbability;
+
+        print("Left Eye Open Probability: $leftEyeOpenProbability");
+        print("Right Eye Open Probability: $rightEyeOpenProbability");
+
+        // Determine eye states
+        final isLeftEyeClosed = leftEyeOpenProbability != null && leftEyeOpenProbability < 0.4;
+        final isRightEyeClosed = rightEyeOpenProbability != null && rightEyeOpenProbability < 0.4;
+
         return {
           'croppedFace': croppedFace,
           'boundingBox': boundingBox,
+          'leftEye': leftEye,
+          'rightEye': rightEye,
+          'isLeftEyeClosed': isLeftEyeClosed,
+          'isRightEyeClosed': isRightEyeClosed
         };
 
       } catch (e) {
