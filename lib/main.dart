@@ -186,7 +186,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               if (isLeftEyeClosed && isRightEyeClosed) {
                 eyeDrowsyCount++;
                 print("Eye closed count: $eyeDrowsyCount");
-                if (eyeDrowsyCount >= 30) {
+                if (eyeDrowsyCount >= 25) {
                   // Play sound alert after consecutive eyes closed detections
                   await audioPlayer.play(AssetSource('sounds/warning.mp3'));
                   print("Drowsy");
@@ -613,7 +613,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     if (decodedImage == null) throw Exception("Failed to decode face image.");
 
     // Resize to match model input dimensions (e.g., 224x224)
-    final resizedImage = img.copyResize(decodedImage, width: 120, height: 120);
+    final resizedImage = img.copyResize(decodedImage, width: 128, height: 128);
 
     // Normalize pixel values to [0, 1]
     List<double> normalizedPixels = [];

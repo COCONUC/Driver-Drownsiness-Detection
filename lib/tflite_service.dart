@@ -13,7 +13,7 @@ class TFLiteService {
     // var gpuDelegate = GpuDelegateV2();
     // var options = InterpreterOptions()..addDelegate(gpuDelegate);
     try {
-      _interpreter = await Interpreter.fromAsset('models/yawn-model.tflite');
+      _interpreter = await Interpreter.fromAsset('models/yawn-model-mobileNetV2.tflite');
       print("Model loaded successfully!");
     } catch (e) {
       print("Error loading model: $e");
