@@ -238,7 +238,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     _cameraController!.stopImageStream();
 
     setState(() {
-      showBoundingBox = !showBoundingBox;
+      showBoundingBox = false;
       detectionResult = "No Result";
     });
     // print("Detection Stopped!");
@@ -703,6 +703,17 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         ),
             ],
     ),
+          if (isDetecting && detectionResult.isNotEmpty)
+            Container(
+              color: detectionResult.contains("Drowsy") ? Colors.red : Colors.green,
+              height: 50,
+              child: Center(
+                child: Text(
+                  detectionResult,
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ),
+            ),
           SizedBox(height: 20),
           // Start/Stop Detection Button
           ElevatedButton(
@@ -714,19 +725,14 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               }
               setState(() {}); // Update button text
             },
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.black, backgroundColor: isDetecting ? Colors.yellow : Colors.green, // Text color
+              padding: EdgeInsets.symmetric(horizontal: 52, vertical: 22), // Padding for better UI
+            ),
             child: Text(isDetecting ? "Stop Detection" : "Start Detection"),
           ),
-          if (detectionResult.isNotEmpty)
-            Container(
-              color: detectionResult.contains("Drowsy") ? Colors.red : Colors.green,
-              height: 50,
-              child: Center(
-                child: Text(
-                  detectionResult,
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
-              ),
-            ),
+          SizedBox(height: 20,),
+          if (isDetecting)
           ElevatedButton(
             onPressed: () {
               setState(() {
