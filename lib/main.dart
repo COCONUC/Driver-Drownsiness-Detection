@@ -72,7 +72,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool _isInitialized = false; // Add flag to track initialization
   bool _isCapturing = false; // Add a flag to manage concurrent captures
   String detectionResult = 'No Result';
-  String faceDetectionResult = 'No Result';
+  String faceDetectionResult = 'No Face Detected';
   Timer? _detectionTimer;
   DateTime? _lastDetectionTime; // Track the last detection time
   DateTime? _lastFaceDetectionTime; // Track the last detection time
@@ -694,10 +694,11 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               ),
             ),
           ),
+              if (isDetecting)
         Align(
           alignment: Alignment.bottomCenter,
           child: Text(
-            "Face Detection Result: $faceDetectionResult",
+            faceDetectionResult,
             style: TextStyle(fontSize: 18, color: Colors.black),
           ),
         ),
@@ -729,7 +730,12 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               foregroundColor: Colors.black, backgroundColor: isDetecting ? Colors.yellow : Colors.green, // Text color
               padding: EdgeInsets.symmetric(horizontal: 52, vertical: 22), // Padding for better UI
             ),
-            child: Text(isDetecting ? "Stop Detection" : "Start Detection"),
+            child: Text(isDetecting ? "Stop Detection" : "Start Detection",
+              style: TextStyle(
+                fontWeight: FontWeight.bold, // Make the text bold
+                fontSize: 18,               // Optional: Adjust text size
+              ),
+            ),
           ),
           SizedBox(height: 20,),
           if (isDetecting)
