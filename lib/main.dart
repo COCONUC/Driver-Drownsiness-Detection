@@ -186,7 +186,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               if (isLeftEyeClosed && isRightEyeClosed) {
                 eyeDrowsyCount++;
                 print("Eye closed count: $eyeDrowsyCount");
-                if (eyeDrowsyCount >= 25) {
+                if (eyeDrowsyCount >= 20) {
                   // Play sound alert after consecutive eyes closed detections
                   await audioPlayer.play(AssetSource('sounds/warning.mp3'));
                   print("Drowsy");
@@ -318,7 +318,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
         drowsyCount++;
         print("Drowsy count: $drowsyCount");
 
-        if (drowsyCount >= 4) {
+        if (drowsyCount >= 5) {
           // Play sound alert after consecutive drowsy detections
           await audioPlayer.play(AssetSource('sounds/warning.mp3'));
           drowsyCount = 0; // Reset counter after alert
